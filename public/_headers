@@ -1,10 +1,15 @@
-# Cloudflare Pages のキャッシュ制御
-# version.json は更新をすぐ伝えたいので短く、cards.json は ETag による
-# 再検証にまかせる（Pages が自動で ETag を付けるため、中身が変わらなければ 304 が返る）。
+# 配信のキャッシュ制御。
+# version.json はカード更新の検知に使うので短め。
+# cards.json は 5MB あるので少し長めに持たせ、あとは ETag による再検証にまかせる。
+# events.json は毎起動で読み直す前提。ETag が付くので、変化が無ければ 304 で済む。
 /version.json
   Cache-Control: public, max-age=300, must-revalidate
   Access-Control-Allow-Origin: *
 
 /cards.json
   Cache-Control: public, max-age=600, must-revalidate
+  Access-Control-Allow-Origin: *
+
+/events.json
+  Cache-Control: public, max-age=0, must-revalidate
   Access-Control-Allow-Origin: *
