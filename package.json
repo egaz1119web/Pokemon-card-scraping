@@ -1,0 +1,20 @@
+{
+  "name": "pokemon-card-data",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsx src/build.ts",
+    "validate": "tsx src/validate.ts",
+    "typecheck": "tsc --noEmit",
+    "compare": "tsx src/compare.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

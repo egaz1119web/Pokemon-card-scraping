@@ -1,0 +1,96 @@
+name: update-cards
+
+on:
+  schedule:
+    # 毎日 03:10 JST（= 18:10 UTC）。公式サイトの更新は日中なので夜間に回す。
+    - cron: "10 18 * * *"
+  workflow_dispatch:
+    inputs:
+      refresh_all:
+        description: "既存カードもすべて取得し直す（パース修正の反映用）"
+        type: boolean
+        default: false
+
+# 同時に走ると data/cards.json の書き込みが競合するため直列化する
+concurrency:
+  group: update-cards
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # 公式サイトの WAF に当たると 403 になる。その場合スクリプトは
+      # 取得済みの分を保存して終了コード 75 を返すので、ジョブは失敗扱いにせず
+      # コミットまで進める（続きは次回の実行で再開される）。
+      - name: Build card data
+        id: build
+        env:
+          CONCURRENCY: "1"
+          DELAY_MS: "1000"
+          MAX_FETCH: "1000"
+          REFRESH_ALL: ${{ inputs.refresh_all && '1' || '0' }}
+        run: |
+          set +e
+          npm run build
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "partial=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::アクセス制限により途中で中断した。取得済みの分をコミットする。"
+          elif [ "$code" -ne 0 ]; then
+            exit "$code"
+          fi
+
+      - name: Commit if changed
+        id: commit
+        run: |
+          if git diff --quiet -- data public; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "更新なし"
+            exit 0
+          fi
+          version=$(node -p "require('./data/state.json').version")
+          count=$(node -p "require('./data/cards.json').length")
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data public
+          suffix=""
+          if [ "${{ steps.build.outputs.partial }}" = "true" ]; then suffix=" [途中]"; fi
+          git commit -m "カードデータ更新 v${version} (${count}件)${suffix}"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Discord
+        if: steps.commit.outputs.changed == 'true' && env.DISCORD_WEBHOOK_URL != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -sS -X POST -H "Content-Type: application/json" \
+            -d "$(node -pe 'JSON.stringify({content: process.argv[1]})' \
+                  "カードデータを更新しました v${{ steps.commit.outputs.version }}（全 ${{ steps.commit.outputs.count }} 件）")" \
+            "$DISCORD_WEBHOOK_URL"
+
+      - name: Notify Discord on failure
+        if: failure() && env.DISCORD_WEBHOOK_URL != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -sS -X POST -H "Content-Type: application/json" \
+            -d '{"content":"カードデータの更新に失敗しました。Actions のログを確認してください。"}' \
+            "$DISCORD_WEBHOOK_URL"
