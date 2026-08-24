@@ -3,7 +3,8 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
+    // page.evaluate の中はブラウザ側で動くため DOM の型が要る
+    "lib": ["ES2022", "DOM"],
     "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,

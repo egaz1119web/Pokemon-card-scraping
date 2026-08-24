@@ -10,10 +10,12 @@
     "build": "tsx src/build.ts",
     "validate": "tsx src/validate.ts",
     "typecheck": "tsc --noEmit",
-    "compare": "tsx src/compare.ts"
+    "compare": "tsx src/compare.ts",
+    "events": "tsx src/events.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "playwright-core": "^1.62.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "wrangler": "^4.125.0"
