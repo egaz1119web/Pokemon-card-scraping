@@ -33,6 +33,23 @@ const DELAY_MS = Number(process.env.DELAY_MS ?? 1000);
 const MAX_FETCH = Number(process.env.MAX_FETCH ?? 1000);
 /** 既存カードもすべて取得し直す。パース修正を全件へ反映したいときに使う。 */
 const REFRESH_ALL = process.env.REFRESH_ALL === "1";
+/**
+ * 旧 GAS 由来の取りこぼしが残っているカードだけを取得し直す。
+ * 全件更新は 8,500 件あって時間もアクセスもかかるため、
+ * 移行時の後始末はこちらで足りる。
+ */
+const REFRESH_DIRTY = process.env.REFRESH_DIRTY === "1";
+/** 指定した cardId だけ取り直す。カンマ区切り。パース修正の効果を狭く確かめたいときに使う。 */
+const REFRESH_IDS = (process.env.REFRESH_IDS ?? "")
+  .split(",")
+  .map((v) => v.trim())
+  .filter((v) => v !== "");
+
+/** 本文に HTML タグや \r が残っている＝旧パーサの取りこぼし */
+function hasLegacyArtifacts(card: CardRecord): boolean {
+  const fields = [card.ability, card.tech1Ability, card.tech2Ability, card.trainerAbility];
+  return fields.some((v) => v != null && (v.includes("<") || v.includes("\r")));
+}
 
 interface RefreshProgress {
   startedAt: string;
@@ -122,16 +139,28 @@ async function main(): Promise<void> {
   const progress = readJson<RefreshProgress>(REFRESH_PROGRESS, { startedAt: "", done: [] });
   const alreadyRefreshed = new Set(progress.done);
 
-  const targets = REFRESH_ALL
-    ? [...live, ...retainedEntries].filter((e) => !alreadyRefreshed.has(cardIdOf(e)))
-    : live.filter((e) => !byId.has(cardIdOf(e)));
-
+  const everything = [...live, ...retainedEntries];
+  let targets: ListEntry[];
   if (REFRESH_ALL) {
-    const total = live.length + retainedEntries.length;
-    console.log(`全件更新: 対象 ${total} 件中 ${alreadyRefreshed.size} 件が取得済み、残り ${targets.length} 件`);
+    targets = everything.filter((e) => !alreadyRefreshed.has(cardIdOf(e)));
+    console.log(
+      `全件更新: 対象 ${everything.length} 件中 ${alreadyRefreshed.size} 件が取得済み、残り ${targets.length} 件`,
+    );
+  } else if (REFRESH_IDS.length > 0) {
+    const wanted = new Set(REFRESH_IDS);
+    targets = everything.filter((e) => wanted.has(cardIdOf(e)));
+    console.log(`指定更新: ${targets.length} 件（指定 ${REFRESH_IDS.length} 件）`);
+  } else if (REFRESH_DIRTY) {
+    const dirty = new Set(master.filter(hasLegacyArtifacts).map((c) => c.cardId));
+    targets = everything.filter((e) => dirty.has(cardIdOf(e)) && !alreadyRefreshed.has(cardIdOf(e)));
+    console.log(
+      `取りこぼし修復: 該当 ${dirty.size} 件中 ${alreadyRefreshed.size} 件が取得済み、残り ${targets.length} 件`,
+    );
   } else {
+    targets = live.filter((e) => !byId.has(cardIdOf(e)));
     console.log(`新規カード: ${targets.length} 件`);
   }
+  const trackProgress = REFRESH_ALL || REFRESH_DIRTY;
 
   const batch = targets.slice(0, MAX_FETCH);
   if (batch.length < targets.length) {
@@ -146,7 +175,7 @@ async function main(): Promise<void> {
     for (const card of result.cards) byId.set(card.cardId, card);
     blocked = result.blocked;
 
-    if (REFRESH_ALL) {
+    if (trackProgress) {
       progress.startedAt ||= new Date().toISOString();
       progress.done = [...alreadyRefreshed, ...result.cards.map((c) => c.cardId)];
       writeFileSync(REFRESH_PROGRESS, `${JSON.stringify(progress)}\n`);
@@ -188,7 +217,7 @@ async function main(): Promise<void> {
   } else if (changed || state.pendingBump) {
     state.version += 1;
     state.pendingBump = false;
-    if (REFRESH_ALL) rmSync(REFRESH_PROGRESS, { force: true });
+    if (trackProgress) rmSync(REFRESH_PROGRESS, { force: true });
   }
   state.updatedAt = new Date().toISOString();
 

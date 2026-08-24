@@ -23,7 +23,9 @@ export function changeEneName(text: string): string {
   for (const [key, label] of ENERGY_LABELS) {
     out = out.replaceAll(`<span class="icon-${key} icon"></span>`, label);
   }
-  return out;
+  // 「たね」などは <span> ではなく <img alt="たね" class="icon"> で表現されている。
+  // 旧 GAS 版はこちらを見ておらず、ふしぎなアメの本文に img タグが生で残っていた。
+  return out.replace(/<img\b[^>]*\balt="([^"]*)"[^>]*>/g, "$1");
 }
 
 /**
@@ -33,6 +35,10 @@ export function changeEneName(text: string): string {
  */
 export function cleanText(text: string): string {
   return text
+    // 「特別なルール」の本文は <p><p>...</p></p> と入れ子になっていることがあり、
+    // 外側の開始タグだけ消費されて内側が残る。構造タグなので本文には要らない。
+    .replaceAll("<p>", "")
+    .replaceAll("</p>", "")
     .replaceAll("<br />", "\n")
     .replaceAll("<br/>", "\n")
     .replaceAll("<br>", "\n")

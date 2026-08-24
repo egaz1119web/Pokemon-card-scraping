@@ -34,8 +34,16 @@ function betweenAll(source: string, from: string, to: string): string[] {
  * 続く限り連結してから <p>...</p> を取り出す。
  */
 function joinWrappedText(lines: string[], startIndex: number): string {
-  let buf = lines[startIndex] ?? "";
+  // プリズムエネルギーのように、種別の見出しの直後にさらに「特別なルール」の
+  // 見出しが続き、本文がその先にあるカードがある。見出しと空行は読み飛ばす。
   let i = startIndex;
+  for (let skipped = 0; skipped < 3; skipped++) {
+    const line = lines[i] ?? "";
+    if (line.includes("<p>")) break;
+    if (line.trim() === "" || line.includes("<h2")) i += 1;
+    else break;
+  }
+  let buf = lines[i] ?? "";
   while (buf.trimEnd().endsWith("<br />") && i + 1 < lines.length) {
     i += 1;
     buf += lines[i];
