@@ -11,7 +11,8 @@
     "validate": "tsx src/validate.ts",
     "typecheck": "tsc --noEmit",
     "compare": "tsx src/compare.ts",
-    "events": "tsx src/events.ts"
+    "events": "tsx src/events.ts",
+    "events:pi": "bash scripts/pi-events.sh"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

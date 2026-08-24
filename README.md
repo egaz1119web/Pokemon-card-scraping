@@ -109,6 +109,60 @@ npm run typecheck
 行単位の走査で、`</div>` を挟んで並ぶリンクを途中で打ち切っていた
 （イーブイは 25 件あるうち 2 件しか取れていなかった）。
 
+## 大会結果（シティリーグなど）
+
+カードデータとは取得元も実行場所も違う。
+
+| | カード | 大会結果 |
+|---|---|---|
+| 取得元 | `www.pokemon-card.com` | `players.pokemon-card.com` |
+| 実行場所 | GitHub Actions | **自宅のラズパイ** |
+| 必要なもの | 素の HTTP | **実ブラウザ** |
+
+`players` 側は Cloudflare のボット対策が入っており、TLS フィンガープリントと
+データセンター IP の両方を見ている。実測（2026-08-24）:
+
+| | curl | 実ブラウザ |
+|---|---|---|
+| 自宅回線 | 403 | **200** |
+| GitHub Actions (Azure) | 403 | **403** |
+
+Actions からは実ブラウザを積んでも到達できないため、自宅回線のラズパイから動かす。
+同じ回線から `www.pokemon-card.com` は 200 を返すので、カードデータ側は影響を受けない。
+
+### 実装上の注意
+
+- **UA を必ず明示する。** 省略すると headless 既定の `HeadlessChrome` を含む UA が
+  送られて弾かれる。実測で成功と失敗を分けた唯一の要因だった
+- Playwright は ARM64 Linux 向けの Chromium を配布しないので、OS の Chromium を
+  `executablePath`（既定 `/usr/bin/chromium`）で指す。`playwright-core` を使い
+  ブラウザのダウンロードはしない
+- 一覧は `/event_search` の JSON を使う。旧 GAS はビルドごとに変わる
+  `data-v-*` ハッシュを頼りに HTML を切り出していた
+- デッキ ID は `a[href*="deck/confirm.html/deckID/"]` で取る
+- デッキの代表カード画像は `www.pokemon-card.com` 側にあり、素の fetch で取れる
+
+### 取得範囲
+
+「今後の新規分だけ」を追う方針。`data/events-state.json` に取得済みの
+`eventId` を記録し、一覧の 1 ページ目がすべて既知になった時点で遡るのをやめる。
+
+移行時点で 2026 年 1 月 23 日から約 4.5 か月分の欠損があるが、これは追わない。
+`BOOTSTRAP=1` を付けて実行すると、詳細を取得せず「いま見えているものを取得済みとして
+記録するだけ」になる。基準点の設定に使う（初回に実行済み）。
+
+### ラズパイ側
+
+```bash
+cd ~/pokemon-card-scraping
+npm run events:pi     # 取得 → 変化があれば commit & push
+```
+
+push には `github-pcg` というホスト別名の SSH 鍵を使う（`~/.ssh/config`）。
+`sf6checker_lp` 用のデプロイキーと衝突させないため別鍵にしてある。
+
+Node-RED の `exec` ノードから `npm run events:pi` を叩いて定期実行する。
+
 ## セットアップ
 
 ### Cloudflare
