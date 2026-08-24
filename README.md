@@ -111,8 +111,43 @@ npm run typecheck
 
 ## セットアップ
 
-1. GitHub にリポジトリを作成して push
-2. Cloudflare Pages で当リポジトリを接続
-   - ビルドコマンド: なし
-   - 出力ディレクトリ: `public`
-3. （任意）Actions の Secrets に `DISCORD_WEBHOOK_URL` を登録すると更新を通知する
+### Cloudflare
+
+Cloudflare のダッシュボードから **Workers & Pages → Create → Connect to Git** で
+このリポジトリを接続する。ビルドは不要なので設定はこれだけ:
+
+| 項目 | 値 |
+|---|---|
+| Build command | 空欄 |
+| Deploy command | `npx wrangler deploy`（既定のまま） |
+
+デプロイの内容は `wrangler.jsonc` が持っている。`public/` を静的アセットとして
+アップロードするだけで、Worker スクリプト（`main`）は無い。
+
+```jsonc
+{
+  "name": "pokemon-card-data",
+  "compatibility_date": "2026-08-24",
+  "assets": { "directory": "./public" }
+}
+```
+
+**`name` は配信ドメインになる**（`<name>.<アカウント名>.workers.dev`）。
+ダッシュボードで作ったプロジェクト名と食い違うと別の Worker が作られるので、
+既にプロジェクトがある場合はその名前に合わせること。
+
+静的アセットへのリクエストは無料かつ無制限で、帯域の課金も無い。
+`public/_headers` のキャッシュ指定もそのまま効く。
+
+> Workers Builds は `npx wrangler deploy` を実行する。`wrangler.jsonc` が
+> 無いとエントリポイントを見つけられず
+> `error occurred while running deploy command` で落ちる。
+
+### GitHub Actions
+
+Secrets に `DISCORD_WEBHOOK_URL` を登録すると、更新と失敗を通知する（任意）。
+それ以外の設定は不要で、`main` への push が Cloudflare のデプロイを兼ねる。
+
+```
+Actions (毎日 03:10 JST) → main に commit/push → Cloudflare が自動デプロイ
+```
