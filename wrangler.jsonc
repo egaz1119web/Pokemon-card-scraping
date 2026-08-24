@@ -2,7 +2,9 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   // Workers Builds は `npx wrangler deploy` を実行する。この設定が無いと
   // エントリポイントを見つけられず "error occurred while running deploy command" になる。
-  "name": "pokemon-card-data",
+  // ダッシュボードで作成した Worker 名に合わせること。
+  // ここが食い違うとローカルからの wrangler deploy が別の Worker を作ってしまう。
+  "name": "pokemon-card-scraping",
   "compatibility_date": "2026-08-24",
   // 配信するのは public/ の静的 JSON だけ。Worker スクリプト（main）は不要。
   // 静的アセットへのリクエストは無料かつ無制限で、帯域課金も無い。

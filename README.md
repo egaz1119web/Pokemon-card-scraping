@@ -126,15 +126,17 @@ Cloudflare のダッシュボードから **Workers & Pages → Create → Conne
 
 ```jsonc
 {
-  "name": "pokemon-card-data",
+  "name": "pokemon-card-scraping",
   "compatibility_date": "2026-08-24",
   "assets": { "directory": "./public" }
 }
 ```
 
-**`name` は配信ドメインになる**（`<name>.<アカウント名>.workers.dev`）。
-ダッシュボードで作ったプロジェクト名と食い違うと別の Worker が作られるので、
-既にプロジェクトがある場合はその名前に合わせること。
+**`name` はダッシュボードの Worker 名に合わせること。**
+Workers Builds ではダッシュボード側の名前が優先されるが、ローカルから
+`wrangler deploy` したときに別の Worker を作ってしまうため揃えておく。
+
+配信先: `https://pokemon-card-scraping.op-sarada.workers.dev/`
 
 静的アセットへのリクエストは無料かつ無制限で、帯域の課金も無い。
 `public/_headers` のキャッシュ指定もそのまま効く。
