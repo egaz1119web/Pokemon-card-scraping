@@ -1,8 +1,8 @@
 name: probe-players
 
-# 調査用。continue-on-error を使うとステップの conclusion が success に
-# 塗りつぶされて真の結果が分からないため、ジョブを分けて
-# 「ジョブの成否＝答え」になるようにする。判明したら削除する。
+# 調査用。ジョブの成否がそのまま答えになるようにしてある（continue-on-error は使わない）。
+# 判明済み: 素の curl は手元でも Actions でも 403。実ブラウザなら手元では通る。
+# 残る問い: Actions のデータセンター IP から実ブラウザで通るか。
 
 on:
   push:
@@ -10,32 +10,46 @@ on:
       - ".github/workflows/probe-players.yml"
   workflow_dispatch:
 
-env:
-  API: "https://players.pokemon-card.com/event_search?offset=0&order=4&result_resist=1&event_type[]=3:1&event_type[]=3:2&event_type[]=3:7"
-  UA: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-
 jobs:
-  # このジョブが成功 = Actions から素の curl で到達できる（Playwright 不要）
-  curl-only:
+  # このジョブが成功 = Actions + 実ブラウザで大会結果を取得できる
+  playwright:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
-      - name: curl で event_search を叩く
-        run: |
-          body=$(curl -sS --max-time 20 -H "User-Agent: $UA" "$API")
-          echo "先頭120文字: ${body:0:120}"
-          echo "$body" | head -c 1 | grep -q '{' || { echo "JSON ではない = ブロックされている"; exit 1; }
-          echo "$body" | python3 -c "import json,sys; d=json.load(sys.stdin); print('件数:', len(d.get('event',[])))"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
-  # このジョブが成功 = 詳細ページ（HTML）も素の curl で取れる
-  curl-detail:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: 詳細ページを取得してデッキIDを数える
+      - run: npm i -D playwright@latest && npx playwright install --with-deps chromium
+
+      - name: 実ブラウザで一覧APIと詳細ページを取る
         run: |
-          html=$(curl -sS --max-time 20 -H "User-Agent: $UA" \
-            "https://players.pokemon-card.com/event/detail/953115/result")
-          n=$(printf '%s' "$html" | grep -o 'deck/confirm.html/deckID/[A-Za-z0-9-]*' | sort -u | wc -l)
-          echo "デッキID件数: $n"
-          test "$n" -ge 1
+          cat > probe.mjs <<'JS'
+          import { chromium } from "playwright";
+          const browser = await chromium.launch();
+          const page = await browser.newPage({ locale: "ja-JP" });
+
+          const res = await page.goto("https://players.pokemon-card.com/event/result/list",
+            { waitUntil: "domcontentloaded", timeout: 60000 });
+          console.log("一覧ページ HTTP", res?.status(), "| title:", await page.title());
+          if (res?.status() !== 200) { await browser.close(); process.exit(1); }
+
+          const api = await page.evaluate(async () => {
+            const r = await fetch("/event_search?offset=0&order=4&result_resist=1&event_type[]=3:1&event_type[]=3:2&event_type[]=3:7");
+            const j = await r.json().catch(() => null);
+            return { status: r.status, count: j?.event?.length ?? -1 };
+          });
+          console.log("event_search HTTP", api.status, "| 件数", api.count);
+          if (api.status !== 200 || api.count <= 0) { await browser.close(); process.exit(1); }
+
+          const d = await page.goto("https://players.pokemon-card.com/event/detail/953115/result",
+            { waitUntil: "domcontentloaded", timeout: 60000 });
+          console.log("詳細ページ HTTP", d?.status());
+          const decks = await page.evaluate(() =>
+            [...new Set([...document.querySelectorAll('a[href*="deck/confirm.html/deckID/"]')]
+              .map(a => a.href.split("deckID/")[1]))]);
+          console.log("デッキID", decks.length, decks.slice(0, 3));
+          await browser.close();
+          process.exit(decks.length >= 1 ? 0 : 1);
+          JS
+          node probe.mjs
