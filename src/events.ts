@@ -38,6 +38,16 @@ const MAX_ROWS = Number(process.env.MAX_ROWS ?? 1000);
  * 「過去の欠損は追わず、今後の新規分だけ拾う」ための基準点づくりに使う。
  */
 const BOOTSTRAP = process.env.BOOTSTRAP === "1";
+/**
+ * 取得済みリストを events.json の中身から作り直す。
+ *
+ * BOOTSTRAP は「いま見えているものを取得済みとして記録するだけ」なので、
+ * 詳細を持っていないのに取得済みになった ID が残る。基準点を作った時点で
+ * 一覧に並んでいたものは、そのままだと二度と取りに行かない。
+ * 一覧が更新されない時期に基準点を作ると、その分がまるごと落ちる。
+ * 取りこぼしに気づいたらこれで取得済みを実データに合わせ直す。
+ */
+const RESYNC = process.env.RESYNC === "1";
 
 const LIST_QUERY =
   "offset=0&order=4&result_resist=1&event_type[]=3:1&event_type[]=3:2&event_type[]=3:7";
@@ -154,7 +164,13 @@ async function main(): Promise<void> {
   const state = readJson<EventsState>(STATE, { knownEventIds: [], updatedAt: "" });
 
   // 初回は既存データの ID を取得済みとして取り込む
-  const known = new Set<number>([...state.knownEventIds, ...existing.map((r) => Number(r.eventId))]);
+  const known = RESYNC
+    ? new Set<number>(existing.map((r) => Number(r.eventId)))
+    : new Set<number>([...state.knownEventIds, ...existing.map((r) => Number(r.eventId))]);
+  if (RESYNC) {
+    const dropped = state.knownEventIds.filter((id) => !known.has(id)).length;
+    console.log(`取得済みリストを作り直す: ${dropped} 件を未取得に戻す`);
+  }
   console.log(`既存 ${existing.length} 件 / 取得済み ID ${known.size} 件`);
 
   const { browser, page } = await openBrowser();
