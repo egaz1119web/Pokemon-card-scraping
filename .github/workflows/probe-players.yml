@@ -1,0 +1,51 @@
+name: probe-players
+
+# players.pokemon-card.com は Cloudflare のボット対策が入っており、
+# TLS フィンガープリントで curl / Node fetch を弾く（ヘッダを揃えても 403）。
+# 実ブラウザなら通ることは手元で確認済みだが、GitHub Actions の
+# データセンター IP からでも通るかは実際に叩かないと分からない。
+# これはその 1 回きりの調査用ワークフロー。結果が出たら消す。
+
+on:
+  push:
+    paths:
+      - ".github/workflows/probe-players.yml"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 素の fetch で試す（手元では 403）
+        run: |
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 \
+            -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' \
+            'https://players.pokemon-card.com/event_search?offset=0&order=4&result_resist=1&event_type[]=3:1' || echo "000")
+          echo "curl: HTTP $code"
+
+      - name: 実ブラウザ（Playwright Chromium）で試す
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@latest >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          cat > probe.mjs <<'JS'
+          import { chromium } from "playwright";
+          const browser = await chromium.launch();
+          const page = await browser.newPage({ locale: "ja-JP" });
+          const res = await page.goto("https://players.pokemon-card.com/event/result/list", { waitUntil: "networkidle", timeout: 60000 });
+          console.log("ページ:", res?.status());
+          const api = await page.evaluate(async () => {
+            const r = await fetch("/event_search?offset=0&order=4&result_resist=1&event_type[]=3:1&event_type[]=3:2&event_type[]=3:7");
+            const t = await r.text();
+            return { status: r.status, head: t.slice(0, 200) };
+          });
+          console.log("API:", api.status);
+          console.log("先頭:", api.head);
+          await browser.close();
+          JS
+          node probe.mjs
