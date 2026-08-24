@@ -220,6 +220,9 @@ async function main(): Promise<void> {
   );
 
   console.log(added.length > 0 ? `追加 ${added.length} 件 / 全 ${merged.length} 件` : `追加なし / 全 ${merged.length} 件`);
+  // 呼び出し側（scripts/pi-events.sh）が「実際に増えたのか」を判別するために出す。
+  // 取得済みリストだけが変わった回を「更新」と呼ぶと通知が嘘になる。
+  console.log(`__ADDED__ ${added.length}`);
 }
 
 main().catch((err) => {

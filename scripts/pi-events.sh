@@ -19,12 +19,17 @@ DATA_FILES=(data/events.json data/events-state.json public/events.json)
 
 status() { echo "__STATUS__ {\"updated\":$1,\"count\":$2,\"reason\":\"$3\"}"; }
 
-if ! npm run --silent events; then
+out=$(npm run --silent events 2>&1) || {
+  echo "$out"
   status false 0 "大会結果の取得に失敗"
   exit 30
-fi
+}
+echo "$out"
 
 count=$(node -p "require('./data/events.json').length")
+# イベントが実際に増えた件数。取得済みリストの更新だけの回と区別する。
+added=$(printf '%s' "$out" | sed -n 's/^__ADDED__ \([0-9]*\)$/\1/p' | tail -1)
+added=${added:-0}
 
 if git diff --quiet -- "${DATA_FILES[@]}"; then
   echo "更新なし"
@@ -33,7 +38,11 @@ if git diff --quiet -- "${DATA_FILES[@]}"; then
 fi
 
 git add "${DATA_FILES[@]}"
-git commit -q -m "大会結果を更新（全 ${count} 件）"
+if [ "$added" -gt 0 ]; then
+  git commit -q -m "大会結果を更新（+${added} 件 / 全 ${count} 件）"
+else
+  git commit -q -m "取得済みリストを更新（イベントの増減なし）"
+fi
 
 # カード側（GitHub Actions）が先に push している場合に備えて取り込む。
 # 触るファイルが分かれているので通常は素通りする。
@@ -48,5 +57,11 @@ if ! git push -q origin HEAD:main; then
   exit 40
 fi
 
-echo "更新して push した（全 ${count} 件）"
-status true "$count" ""
+if [ "$added" -gt 0 ]; then
+  echo "大会結果を ${added} 件追加して push した（全 ${count} 件）"
+  status true "$count" ""
+else
+  # 中身は増えていないので通知はしない
+  echo "取得済みリストのみ更新して push した"
+  status false "$count" ""
+fi
