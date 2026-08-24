@@ -226,7 +226,9 @@ async function main(): Promise<void> {
   writeFileSync(STATE, `${JSON.stringify(state, null, 2)}\n`);
   // 旧 Supabase の PostgREST と同じ「配列」で返す。アプリ側のレスポンス型を変えずに済む。
   writeFileSync(`${OUT_DIR}/cards.json`, JSON.stringify(ordered.map(normalizeKeyOrder)));
-  writeFileSync(`${OUT_DIR}/version.json`, JSON.stringify([{ version: state.version }]));
+  // 旧 Supabase が返していた形（[{"id":1,"version":N}]）に合わせる。
+  // iOS 側の Version 型は id を必須にしているため、省くとデコードに失敗する。
+  writeFileSync(`${OUT_DIR}/version.json`, JSON.stringify([{ id: 1, version: state.version }]));
 
   // 大会結果は別管理（data/events.json）。カード巡回とは無関係にそのまま配信へ流す。
   if (existsSync(EVENTS)) {
