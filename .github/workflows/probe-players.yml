@@ -1,7 +1,8 @@
 name: probe-players
 
-# 調査用。ログの取得には管理者権限が要るため、結果は「ステップの成否」で表す。
-# 各ステップは到達できれば成功、ブロックされれば失敗する。判明したら削除する。
+# 調査用。continue-on-error を使うとステップの conclusion が success に
+# 塗りつぶされて真の結果が分からないため、ジョブを分けて
+# 「ジョブの成否＝答え」になるようにする。判明したら削除する。
 
 on:
   push:
@@ -9,68 +10,32 @@ on:
       - ".github/workflows/probe-players.yml"
   workflow_dispatch:
 
+env:
+  API: "https://players.pokemon-card.com/event_search?offset=0&order=4&result_resist=1&event_type[]=3:1&event_type[]=3:2&event_type[]=3:7"
+  UA: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
 jobs:
-  probe:
+  # このジョブが成功 = Actions から素の curl で到達できる（Playwright 不要）
+  curl-only:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: RESULT-curl-passes
-        id: curl
-        continue-on-error: true
+      - name: curl で event_search を叩く
         run: |
-          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 \
-            -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' \
-            'https://players.pokemon-card.com/event_search?offset=0&order=4&result_resist=1&event_type[]=3:1')
-          echo "HTTP $code"
-          test "$code" = "200"
+          body=$(curl -sS --max-time 20 -H "User-Agent: $UA" "$API")
+          echo "先頭120文字: ${body:0:120}"
+          echo "$body" | head -c 1 | grep -q '{' || { echo "JSON ではない = ブロックされている"; exit 1; }
+          echo "$body" | python3 -c "import json,sys; d=json.load(sys.stdin); print('件数:', len(d.get('event',[])))"
 
-      - name: setup-playwright
+  # このジョブが成功 = 詳細ページ（HTML）も素の curl で取れる
+  curl-detail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 詳細ページを取得してデッキIDを数える
         run: |
-          npm i -D playwright@latest
-          npx playwright install --with-deps chromium
-
-      - name: RESULT-playwright-page-passes
-        id: page
-        continue-on-error: true
-        run: |
-          cat > page.mjs <<'JS'
-          import { chromium } from "playwright";
-          const b = await chromium.launch();
-          const p = await b.newPage({ locale: "ja-JP" });
-          const r = await p.goto("https://players.pokemon-card.com/event/result/list", { waitUntil: "domcontentloaded", timeout: 60000 });
-          const status = r?.status();
-          console.log("page HTTP", status, "| title:", await p.title());
-          await b.close();
-          process.exit(status === 200 ? 0 : 1);
-          JS
-          node page.mjs
-
-      - name: RESULT-playwright-api-passes
-        id: api
-        continue-on-error: true
-        run: |
-          cat > api.mjs <<'JS'
-          import { chromium } from "playwright";
-          const b = await chromium.launch();
-          const p = await b.newPage({ locale: "ja-JP" });
-          await p.goto("https://players.pokemon-card.com/event/result/list", { waitUntil: "domcontentloaded", timeout: 60000 });
-          const out = await p.evaluate(async () => {
-            const r = await fetch("/event_search?offset=0&order=4&result_resist=1&event_type[]=3:1&event_type[]=3:2&event_type[]=3:7");
-            const j = await r.text();
-            return { status: r.status, len: j.length, isJson: j.trimStart().startsWith("{") };
-          });
-          console.log("api", JSON.stringify(out));
-          await b.close();
-          process.exit(out.status === 200 && out.isJson ? 0 : 1);
-          JS
-          node api.mjs
-
-      - name: 判定サマリ
-        run: |
-          echo "curl:              ${{ steps.curl.outcome }}"
-          echo "playwright page:   ${{ steps.page.outcome }}"
-          echo "playwright api:    ${{ steps.api.outcome }}"
+          html=$(curl -sS --max-time 20 -H "User-Agent: $UA" \
+            "https://players.pokemon-card.com/event/detail/953115/result")
+          n=$(printf '%s' "$html" | grep -o 'deck/confirm.html/deckID/[A-Za-z0-9-]*' | sort -u | wc -l)
+          echo "デッキID件数: $n"
+          test "$n" -ge 1
