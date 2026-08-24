@@ -214,10 +214,16 @@ async function main(): Promise<void> {
   mkdirSync("public", { recursive: true });
   writeFileSync(EVENTS, `${JSON.stringify(merged, null, 1)}\n`);
   writeFileSync(OUT, JSON.stringify(merged));
-  writeFileSync(
-    STATE,
-    `${JSON.stringify({ knownEventIds: [...known].sort((a, b) => b - a).slice(0, 5000), updatedAt: new Date().toISOString() }, null, 1)}\n`,
-  );
+  // 取得済み ID が増えたときだけ書く。
+  // 毎回 updatedAt を更新すると、中身が変わっていない日も差分が出て
+  // 空のコミットが毎日積まれてしまう。
+  const nextKnown = [...known].sort((a, b) => b - a).slice(0, 5000);
+  if (JSON.stringify(nextKnown) !== JSON.stringify(state.knownEventIds)) {
+    writeFileSync(
+      STATE,
+      `${JSON.stringify({ knownEventIds: nextKnown, updatedAt: new Date().toISOString() }, null, 1)}\n`,
+    );
+  }
 
   console.log(added.length > 0 ? `追加 ${added.length} 件 / 全 ${merged.length} 件` : `追加なし / 全 ${merged.length} 件`);
   // 呼び出し側（scripts/pi-events.sh）が「実際に増えたのか」を判別するために出す。
