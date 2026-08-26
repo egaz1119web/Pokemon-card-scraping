@@ -123,20 +123,32 @@ async function fetchListPage(page: Page, offset: number): Promise<ListEntry[]> {
   }));
 }
 
-/** 詳細ページから上位 8 名のデッキ ID を取る。CSS セレクタなので DOM の小変更に強い。 */
+/** 順位表のデッキへのリンク。ここを目印に「表が出来上がったか」を待つ。 */
+const DECK_LINK = 'a[href*="deck/confirm.html/deckID/"]';
+
+/**
+ * 詳細ページから上位 8 名のデッキ ID を取る。CSS セレクタなので DOM の小変更に強い。
+ *
+ * 順位表は HTML には入っておらず、読み込み後に JS が組み立てる。
+ * domcontentloaded の直後に読むと表がまだ無く、どのイベントも
+ * 「デッキ 0 件」に見えて全部見送られる。必ずリンクが出るまで待つこと。
+ */
 async function fetchDeckIds(page: Page, eventId: number): Promise<string[]> {
   const res = await page.goto(`https://players.pokemon-card.com/event/detail/${eventId}/result`, {
     waitUntil: "domcontentloaded",
     timeout: 90_000,
   });
   if (res?.status() !== 200) return [];
-  return page.evaluate(() => {
+  // 出ないまま終わるページもある（結果が未登録、デッキ非公開など）。
+  // その場合は待ち切って 0 件を返し、呼び出し側の見送り判定に任せる。
+  await page.waitForSelector(DECK_LINK, { timeout: 15_000 }).catch(() => {});
+  return page.evaluate((sel) => {
     const anchors = Array.prototype.slice.call(
-      document.querySelectorAll('a[href*="deck/confirm.html/deckID/"]'),
+      document.querySelectorAll(sel),
     ) as HTMLAnchorElement[];
     const ids = anchors.map((a) => a.href.split("deckID/")[1]!.replace(/\/$/, ""));
     return Array.from(new Set(ids));
-  });
+  }, DECK_LINK);
 }
 
 /**
