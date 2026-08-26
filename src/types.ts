@@ -25,6 +25,16 @@ export interface CardRecord {
   rare: string;
   evoType: string;
   attribute: string;
+  /**
+   * いま公式のスタンダード検索（regulation_sidebar_form=XY）に出てくるか。
+   *
+   * 積み上げ式なのでレギュレーション落ちしたカードも配信に残り続ける。
+   * ユーザーの保存デッキが参照しているため消せないが、そのままだとアプリの
+   * カード検索にも出てしまう。実際に 8,539 件のうち 2,991 件が該当していた。
+   * どのカードを検索に出すかはアプリ側の判断なので、データとしては
+   * 「一覧に載っているか」だけを渡す。build.ts が毎回付け直す。
+   */
+  standard: boolean;
 }
 
 /** resultAPI.php の cardList 要素 */
@@ -47,6 +57,7 @@ export const CARD_KEYS: (keyof CardRecord)[] = [
   "nameJp", "imageUrl", "type", "pack", "abilityName", "ability",
   "tech1Name", "tech1Ability", "tech2Name", "tech2Ability", "trainerAbility",
   "evoList", "illust", "cardId", "sortId", "pokemonType", "rare", "evoType", "attribute",
+  "standard",
 ];
 
 /** キー順を固定したうえでレコードを作り直す */

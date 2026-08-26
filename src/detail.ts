@@ -185,6 +185,8 @@ export function parseDetail(html: string, entry: ListEntry, sortId: number): Car
     rare,
     evoType,
     attribute: toBracketList([...new Set(attribute)]),
+    // 詳細ページからは分からない。build.ts が一覧と突き合わせて付け直す。
+    standard: false,
   };
 }
 

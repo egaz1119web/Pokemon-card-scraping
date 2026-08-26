@@ -199,10 +199,12 @@ async function main(): Promise<void> {
     .sort((a, b) => a.sortId - b.sortId)
     .map((c) => c.cardId);
 
+  // standard は毎回ここで付け直す。ローテーションが来れば live が入れ替わるので、
+  // 手で管理する一覧を持たなくても翌日の実行で自動的に切り替わる。
   const ordered: CardRecord[] = [];
   for (const id of [...liveIds, ...retained]) {
     const card = byId.get(id);
-    if (card) ordered.push({ ...card, sortId: ordered.length + 1 });
+    if (card) ordered.push({ ...card, sortId: ordered.length + 1, standard: liveIdSet.has(id) });
   }
 
   const changed =
