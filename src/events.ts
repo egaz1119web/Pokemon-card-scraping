@@ -49,6 +49,12 @@ const BOOTSTRAP = process.env.BOOTSTRAP === "1";
  */
 const RESYNC = process.env.RESYNC === "1";
 
+/**
+ * 取り込むレギュレーション。アプリはスタンダードしか扱わないので、
+ * エクストラの結果が混ざるとレギュレーション落ちのカードがデッキに出てくる。
+ */
+const REGULATION = "スタンダード";
+
 const LIST_QUERY =
   "offset=0&order=4&result_resist=1&event_type[]=3:1&event_type[]=3:2&event_type[]=3:7";
 
@@ -67,6 +73,8 @@ interface ListEntry {
   title: string;
   shop: string;
   league: string;
+  /** 一覧が返すレギュレーション名。取り込みの可否を決めるだけで、配信データには入れない。 */
+  regulation: string;
 }
 
 interface EventsState {
@@ -120,6 +128,7 @@ async function fetchListPage(page: Page, offset: number): Promise<ListEntry[]> {
     // 公式主催のイベントは shop_name が空になる
     shop: (e["shop_name"] as string) || "株式会社ポケモン",
     league: String(e["leagueName"] ?? ""),
+    regulation: String(e["regulation"] ?? ""),
   }));
 }
 
@@ -194,8 +203,18 @@ async function main(): Promise<void> {
       const rows = await fetchListPage(page, p * 20);
       if (rows.length === 0) break;
       const fresh = rows.filter((r) => !known.has(r.eventId));
-      candidates.push(...fresh);
-      console.log(`  一覧 ${p + 1} ページ目: ${rows.length} 件中 ${fresh.length} 件が未取得`);
+      // エクストラは取り込まない。取得済みにも入れないので、
+      // 判定を変えたくなったら次の実行でそのまま拾い直せる。
+      const wanted = fresh.filter((r) => r.regulation === REGULATION);
+      candidates.push(...wanted);
+      for (const r of fresh) {
+        if (r.regulation !== REGULATION) {
+          console.log(`  ${REGULATION} 以外のため除外（${r.regulation || "レギュレーション不明"}）: ${r.title}`);
+        }
+      }
+      // 打ち切りの判定は「未取得が有るか」で見る。除外したぶんを数に入れると、
+      // エクストラだけのページに当たったところで遡るのをやめてしまう。
+      console.log(`  一覧 ${p + 1} ページ目: ${rows.length} 件中 ${fresh.length} 件が未取得（取得対象 ${wanted.length} 件）`);
       // 日付降順なので、1 ページまるごと既知になったらそれ以上は遡らない
       if (fresh.length === 0) break;
       await sleep(2000);
@@ -219,7 +238,9 @@ async function main(): Promise<void> {
           continue;
         }
 
-        const record: EventRecord = { ...entry };
+        // regulation は取り込みの判定にしか使わない。配信データの形は変えない。
+        const { regulation: _regulation, ...fields } = entry;
+        const record: EventRecord = { ...fields };
         for (const [n, key] of DECK_KEYS.entries()) {
           const deckId = deckIds[n]!;
           record[`${key}Image`] = await fetchDeckImage(deckId);
