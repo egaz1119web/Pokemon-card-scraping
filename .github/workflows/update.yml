@@ -86,7 +86,17 @@ jobs:
           extra_note=""
           if [ "$extra" -gt 0 ]; then extra_note=" +エクストラ${extra}件"; fi
           git commit -m "カードデータ更新 v${version} (${count}件${extra_note})${suffix}"
-          git push
+          # 全件更新は 1 回が数時間かかる。その間にこのブランチへ別のコミットが
+          # 入っていると push が弾かれ、取得済みのデータがランナーごと消える。
+          # 実際 2026-08-31 の 8,000 件の実行がこれで丸ごと無駄になった。
+          # データの変更は data/ と public/ にしか無いので、取り込み直して押す。
+          pushed=false
+          for _ in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi
+            echo "::warning::push が弾かれた。取り込み直して再試行する。"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+          if [ "$pushed" != true ]; then exit 1; fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "count=${count}" >> "$GITHUB_OUTPUT"
