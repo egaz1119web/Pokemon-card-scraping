@@ -7,14 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       refresh_all:
-        description: "既存カードもすべて取得し直す（パース修正の反映用）"
+        # 「取得し直す」とだけ書くと毎回ゼロから始まるように読めるが、実際は
+        # data/refresh-progress.json に進捗が残っていて続きから走る。
+        # 取り切るまでは毎回チェックを入れること。外すと進捗が読まれない。
+        description: "全件の取り直しを進める（前回の続きから。取り切るまで毎回チェック）"
         type: boolean
         default: false
       max_fetch:
         # エクストラの初回取り込みは 1 万件を超える。日次の 1000 件のままだと
         # 13 日かかるので、手で回すときだけ上げられるようにしておく。
         # 1 件 1 秒なので、ジョブの上限 330 分に収まるのは 15,000 件あたりまで。
-        description: "1 回の実行で取得する上限（既定 1000）"
+        description: "1 回の実行で取得する上限（1 件 1 秒。既定 1000）"
         type: string
         default: "1000"
 

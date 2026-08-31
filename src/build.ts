@@ -195,6 +195,14 @@ async function main(): Promise<void> {
 
   const progress = readJson<RefreshProgress>(REFRESH_PROGRESS, { startedAt: "", done: [] });
   const alreadyRefreshed = new Set(progress.done);
+  // 全件更新は複数回に分けて走らせる。途中で REFRESH_ALL を落とすと進捗が
+  // 読まれず、取り直しが半端なまま残り続ける。気づけるように言っておく。
+  if (alreadyRefreshed.size > 0 && !REFRESH_ALL && !REFRESH_DIRTY) {
+    console.warn(
+      `全件更新が ${alreadyRefreshed.size} 件で途中のまま残っている。` +
+        "続きを進めるには REFRESH_ALL=1 を付けて実行すること。",
+    );
+  }
 
   // 全件更新で回す対象。いま一覧から拾えているものに、一覧から落ちたカードを足す。
   //
