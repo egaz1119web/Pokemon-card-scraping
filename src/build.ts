@@ -196,10 +196,18 @@ async function main(): Promise<void> {
   const progress = readJson<RefreshProgress>(REFRESH_PROGRESS, { startedAt: "", done: [] });
   const alreadyRefreshed = new Set(progress.done);
 
-  const retainedEntries = [...master, ...extraMaster]
-    .filter((c) => !liveIds.has(c.cardId) && !(extraIds?.has(c.cardId) ?? false))
-    .map(pseudoEntry);
-  const everything = [...live, ...extraOnly, ...retainedEntries];
+  // 全件更新で回す対象。いま一覧から拾えているものに、一覧から落ちたカードを足す。
+  //
+  // 落ちたかどうかは「一覧の項目として拾えたか」で見る。スタンダードから落ちて
+  // エクストラには残っているカード（2,324 件）は BW 一覧には出てくるが、
+  // cards.json 側が受け持つので extraOnly には入らない。両方から漏れるので
+  // ここで拾い直さないと、全件更新の対象からまるごと抜け落ちる。
+  const covered = new Set([...liveIds, ...extraOnly.map(cardIdOf)]);
+  const retainedStandardEntries = master.filter((c) => !covered.has(c.cardId)).map(pseudoEntry);
+  const retainedExtraEntries = extraMaster.filter((c) => !covered.has(c.cardId)).map(pseudoEntry);
+  // 並び順が効く。スタンダード側を先に片づけないと、エクストラ 12,893 件を
+  // 取り終わるまで「未完了」が解けず、version が上がらないままになる。
+  const everything = [...live, ...retainedStandardEntries, ...extraOnly, ...retainedExtraEntries];
 
   let targets: ListEntry[];
   if (REFRESH_ALL) {
