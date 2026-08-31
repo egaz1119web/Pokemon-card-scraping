@@ -41,6 +41,27 @@ export function cardIdOf(entry: ListEntry): string {
   return file.split("_")[0] ?? "";
 }
 
+/**
+ * cardId で重複を落とし、取り込めない項目を捨てる。
+ *
+ * 落とすものは 2 種類ある。
+ *  - 基本闘 / 基本悪エネルギーのように複数 cardID が同じ画像を指すもの（意図した統合）
+ *  - 画像がまだ用意されていないカード。サムネイルが noimage を指すので
+ *    cardIdOf() が "poke" を返し、そのままだと全部 1 件に潰れて
+ *    カード裏面の画像を持つゴミが 1 件できる。エクストラに 5 件ある。
+ */
+export function uniqueByCardId(entries: ListEntry[]): ListEntry[] {
+  const out: ListEntry[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    const id = cardIdOf(entry);
+    if (!/^\d{6}$/.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(entry);
+  }
+  return out;
+}
+
 export async function fetchAllListEntries(
   regulation = "XY",
   delayMs = 250,

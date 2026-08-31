@@ -6,18 +6,25 @@
  * 参照しているため、一度取り込んだカードは消さない。
  * 実際、移行時点の 7,831 件のうち 2,991 件は今の検索結果には出てこない。
  *
+ * 配信はスタンダードとエクストラの 2 本立て。cards.json は今までどおり
+ * スタンダードの積み上げのままにして、エクストラ（BW）にしか無いカードは
+ * cards-extra.json へ分ける。1 ファイルにまとめると 14MB になり、
+ * エクストラを使わない人と旧バージョンのアプリまで巻き込むため。
+ *
  * 公式サイトには WAF が入っており、速く叩きすぎると IP 単位で 403 になる。
  * そのため 1 回の実行量に上限を設け、途中で拒否されても取れた分は保存して
  * 次回の実行で続きから再開する作りにしてある。
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { fetchCard } from "./detail.js";
-import { fetchAllListEntries, cardIdOf } from "./list.js";
+import { fetchAllListEntries, cardIdOf, uniqueByCardId } from "./list.js";
 import { sleep, BlockedError } from "./http.js";
 import type { CardRecord, ListEntry, State } from "./types.js";
 import { normalizeKeyOrder } from "./types.js";
 
 const MASTER = "data/cards.json";
+/** エクストラにしか無いカード。cards.json とは重複させない。 */
+const MASTER_EXTRA = "data/cards-extra.json";
 const STATE = "data/state.json";
 const SEED = "data/golden_allCard.json";
 const EVENTS = "data/events.json";
@@ -44,6 +51,8 @@ const REFRESH_IDS = (process.env.REFRESH_IDS ?? "")
   .split(",")
   .map((v) => v.trim())
   .filter((v) => v !== "");
+/** エクストラを触らない安全弁。スタンダードだけ回したいときに EXTRA=0。 */
+const WITH_EXTRA = process.env.EXTRA !== "0";
 
 /** 本文に HTML タグや \r が残っている＝旧パーサの取りこぼし */
 function hasLegacyArtifacts(card: CardRecord): boolean {
@@ -62,8 +71,55 @@ function readJson<T>(path: string, fallback: T): T {
 
 /** 1 レコード 1 行で書く。git diff で「どのカードが変わったか」がそのまま読める。 */
 function writeLineDelimitedArray(path: string, rows: CardRecord[]): void {
+  if (rows.length === 0) {
+    writeFileSync(path, "[]\n");
+    return;
+  }
   const body = rows.map((r) => JSON.stringify(normalizeKeyOrder(r))).join(",\n");
   writeFileSync(path, `[\n${body}\n]\n`);
+}
+
+/**
+ * レギュレーション落ちしたカードは一覧に出てこないが、詳細ページ自体は生きている。
+ * 全件更新のときはこちらも対象に含めたいので、保持中のレコードから疑似的な一覧項目を作る。
+ */
+function pseudoEntry(card: CardRecord): ListEntry {
+  return {
+    cardID: card.cardId,
+    cardThumbFile: card.imageUrl,
+    cardNameAltText: card.nameJp,
+    cardNameViewText: card.nameJp,
+  };
+}
+
+/**
+ * 並び順どおりにレコードを組み直し、sortId と standard / extra を付け直す。
+ *
+ * 印を毎回ここで付け直すので、ローテーションが来ても手で管理する一覧は要らない。
+ * 一覧を取れなかったレギュレーションについては前回の値を据え置く。
+ */
+function compose(
+  ids: string[],
+  byId: Map<string, CardRecord>,
+  liveIds: Set<string>,
+  extraIds: Set<string> | null,
+): CardRecord[] {
+  const out: CardRecord[] = [];
+  for (const id of ids) {
+    const card = byId.get(id);
+    if (!card) continue;
+    out.push({
+      ...card,
+      sortId: out.length + 1,
+      standard: liveIds.has(id),
+      extra: extraIds ? extraIds.has(id) : (card.extra ?? false),
+    });
+  }
+  return out;
+}
+
+function serialize(rows: CardRecord[]): string {
+  return JSON.stringify(rows.map(normalizeKeyOrder));
 }
 
 /**
@@ -109,37 +165,42 @@ async function main(): Promise<void> {
     master = readJson<CardRecord[]>(SEED, []);
     console.log(`初期化: 既存データ ${master.length} 件を取り込み`);
   }
-  const byId = new Map(master.map((c) => [c.cardId, c]));
+  const extraMaster = readJson<CardRecord[]>(MASTER_EXTRA, []);
+  // 1 枚のカードはどちらか一方にしか入らない。索引は両方を合わせて 1 つ持つ。
+  const byId = new Map([...master, ...extraMaster].map((c) => [c.cardId, c]));
 
   console.log("カード一覧を取得中...");
-  const liveRaw = await fetchAllListEntries();
+  const live = uniqueByCardId(await fetchAllListEntries("XY"));
+  console.log(`スタンダード ${live.length} 件`);
 
-  // 基本闘 / 基本悪エネルギーのように複数 cardID が同一画像を指すことがあるため、先頭を採用して重複を落とす
-  const live: ListEntry[] = [];
-  const seen = new Set<string>();
-  for (const entry of liveRaw) {
-    const id = cardIdOf(entry);
-    if (id === "" || seen.has(id)) continue;
-    seen.add(id);
-    live.push(entry);
+  // エクストラの一覧。ここで落とすとスタンダードの配信まで止まってしまうので、
+  // 取れなければ extra は前回の値のまま据え置き、エクストラ側の更新だけ見送る。
+  let extraLive: ListEntry[] | null = null;
+  if (WITH_EXTRA) {
+    try {
+      extraLive = uniqueByCardId(await fetchAllListEntries("BW"));
+      console.log(`エクストラ ${extraLive.length} 件`);
+    } catch (err) {
+      console.warn(`エクストラの一覧を取得できなかったので今回は据え置く: ${err}`);
+    }
   }
-  console.log(`一覧 ${liveRaw.length} 件 → 重複除去後 ${live.length} 件`);
 
-  // レギュレーション落ちしたカードは一覧に出てこないが、詳細ページ自体は生きている。
-  // 全件更新のときはこちらも対象に含めたいので、保持中のレコードから疑似的な一覧項目を作る。
-  const retainedEntries: ListEntry[] = master
-    .filter((c) => !seen.has(c.cardId))
-    .map((c) => ({
-      cardID: c.cardId,
-      cardThumbFile: c.imageUrl,
-      cardNameAltText: c.nameJp,
-      cardNameViewText: c.nameJp,
-    }));
+  const liveIds = new Set(live.map(cardIdOf));
+  const extraIds = extraLive ? new Set(extraLive.map(cardIdOf)) : null;
+
+  // cards.json が受け持つ範囲。いま一覧にあるものと、過去に取り込んだものすべて。
+  const standardIds = new Set([...liveIds, ...master.map((c) => c.cardId)]);
+  // エクストラにしか無いカード。ここが cards-extra.json の中身になる。
+  const extraOnly = (extraLive ?? []).filter((e) => !standardIds.has(cardIdOf(e)));
 
   const progress = readJson<RefreshProgress>(REFRESH_PROGRESS, { startedAt: "", done: [] });
   const alreadyRefreshed = new Set(progress.done);
 
-  const everything = [...live, ...retainedEntries];
+  const retainedEntries = [...master, ...extraMaster]
+    .filter((c) => !liveIds.has(c.cardId) && !(extraIds?.has(c.cardId) ?? false))
+    .map(pseudoEntry);
+  const everything = [...live, ...extraOnly, ...retainedEntries];
+
   let targets: ListEntry[];
   if (REFRESH_ALL) {
     targets = everything.filter((e) => !alreadyRefreshed.has(cardIdOf(e)));
@@ -151,14 +212,17 @@ async function main(): Promise<void> {
     targets = everything.filter((e) => wanted.has(cardIdOf(e)));
     console.log(`指定更新: ${targets.length} 件（指定 ${REFRESH_IDS.length} 件）`);
   } else if (REFRESH_DIRTY) {
-    const dirty = new Set(master.filter(hasLegacyArtifacts).map((c) => c.cardId));
+    const dirty = new Set([...master, ...extraMaster].filter(hasLegacyArtifacts).map((c) => c.cardId));
     targets = everything.filter((e) => dirty.has(cardIdOf(e)) && !alreadyRefreshed.has(cardIdOf(e)));
     console.log(
       `取りこぼし修復: 該当 ${dirty.size} 件中 ${alreadyRefreshed.size} 件が取得済み、残り ${targets.length} 件`,
     );
   } else {
-    targets = live.filter((e) => !byId.has(cardIdOf(e)));
-    console.log(`新規カード: ${targets.length} 件`);
+    // スタンダードの新着を先に取る。エクストラの積み残しに埋もれさせない。
+    const newStandard = live.filter((e) => !byId.has(cardIdOf(e)));
+    const newExtra = extraOnly.filter((e) => !byId.has(cardIdOf(e)));
+    targets = [...newStandard, ...newExtra];
+    console.log(`新規カード: スタンダード ${newStandard.length} 件 / エクストラ ${newExtra.length} 件`);
   }
   const trackProgress = REFRESH_ALL || REFRESH_DIRTY;
 
@@ -168,11 +232,15 @@ async function main(): Promise<void> {
   }
 
   let blocked = false;
+  const fetchedIds = new Set<string>();
   if (batch.length > 0) {
     const result = await fetchMany(batch, (done, total) => {
       if (done % 50 === 0 || done === total) console.log(`  ${done}/${total}`);
     });
-    for (const card of result.cards) byId.set(card.cardId, card);
+    for (const card of result.cards) {
+      byId.set(card.cardId, card);
+      fetchedIds.add(card.cardId);
+    }
     blocked = result.blocked;
 
     if (trackProgress) {
@@ -188,38 +256,55 @@ async function main(): Promise<void> {
     }
   }
 
-  // まだ取り切れていない対象が残っているか
-  const incomplete = blocked || batch.length < targets.length;
+  // 取り切れなかった対象を、どちらの配信のものか分けて数える。
+  // ここを分けているのが肝で、エクストラの初回取り込み（1 万件以上）が
+  // 走っている間もスタンダードの版は今までどおり上がる。
+  const leftover = targets.filter((e) => !fetchedIds.has(cardIdOf(e)));
+  const standardIncomplete = leftover.some((e) => standardIds.has(cardIdOf(e)));
+  const extraIncomplete = leftover.some((e) => !standardIds.has(cardIdOf(e)));
 
   // 並び順は「今の検索結果の順（新しい弾が先頭）」→「検索から落ちたカードを従来の相対順で後ろに」
-  const liveIds = live.map(cardIdOf);
-  const liveIdSet = new Set(liveIds);
-  const retained = master
-    .filter((c) => !liveIdSet.has(c.cardId))
+  const retainedStandard = master
+    .filter((c) => !liveIds.has(c.cardId))
     .sort((a, b) => a.sortId - b.sortId)
     .map((c) => c.cardId);
+  const ordered = compose([...live.map(cardIdOf), ...retainedStandard], byId, liveIds, extraIds);
 
-  // standard は毎回ここで付け直す。ローテーションが来れば live が入れ替わるので、
-  // 手で管理する一覧を持たなくても翌日の実行で自動的に切り替わる。
-  const ordered: CardRecord[] = [];
-  for (const id of [...liveIds, ...retained]) {
-    const card = byId.get(id);
-    if (card) ordered.push({ ...card, sortId: ordered.length + 1, standard: liveIdSet.has(id) });
-  }
+  // エクストラ側も同じ考え方。sortId はこのファイルの中で 1 から数え直す
+  // （アプリはどちらも使っておらず、通し番号にすると毎日全行が変わってしまう）。
+  const orderedIds = new Set(ordered.map((c) => c.cardId));
+  const extraOnlyIds = new Set(extraOnly.map(cardIdOf));
+  const retainedExtra = extraMaster
+    .filter((c) => !orderedIds.has(c.cardId) && !extraOnlyIds.has(c.cardId))
+    .sort((a, b) => a.sortId - b.sortId)
+    .map((c) => c.cardId);
+  const orderedExtra = compose([...extraOnly.map(cardIdOf), ...retainedExtra], byId, liveIds, extraIds);
 
-  const changed =
-    JSON.stringify(master.map(normalizeKeyOrder)) !== JSON.stringify(ordered.map(normalizeKeyOrder));
+  const changed = serialize(master) !== serialize(ordered);
+  const extraChanged = serialize(extraMaster) !== serialize(orderedExtra);
 
   const state = readJson<State>(STATE, { version: 47, updatedAt: "", pendingBump: false });
 
   // 中途半端な状態でバージョンを上げると、アプリが不完全なデータを全件ダウンロードしてしまう。
   // 取り切るまでは master に書き足すだけにして、完走した回にまとめて 1 つ上げる。
-  if (incomplete) {
+  if (standardIncomplete) {
     if (changed) state.pendingBump = true;
   } else if (changed || state.pendingBump) {
     state.version += 1;
     state.pendingBump = false;
-    if (trackProgress) rmSync(REFRESH_PROGRESS, { force: true });
+  }
+
+  // エクストラの一覧を取れなかった回は、版の判断材料が無いので何もしない。
+  if (extraLive) {
+    if (extraIncomplete) {
+      if (extraChanged) state.extraPendingBump = true;
+    } else if (extraChanged || state.extraPendingBump) {
+      state.extraVersion = (state.extraVersion ?? 0) + 1;
+      state.extraPendingBump = false;
+    }
+  }
+  if (trackProgress && !standardIncomplete && !extraIncomplete) {
+    rmSync(REFRESH_PROGRESS, { force: true });
   }
   state.updatedAt = new Date().toISOString();
 
@@ -227,18 +312,34 @@ async function main(): Promise<void> {
   writeLineDelimitedArray(MASTER, ordered);
   writeFileSync(STATE, `${JSON.stringify(state, null, 2)}\n`);
   // 旧 Supabase の PostgREST と同じ「配列」で返す。アプリ側のレスポンス型を変えずに済む。
-  writeFileSync(`${OUT_DIR}/cards.json`, JSON.stringify(ordered.map(normalizeKeyOrder)));
+  writeFileSync(`${OUT_DIR}/cards.json`, serialize(ordered));
+  if (orderedExtra.length > 0 || existsSync(MASTER_EXTRA)) {
+    writeLineDelimitedArray(MASTER_EXTRA, orderedExtra);
+    writeFileSync(`${OUT_DIR}/cards-extra.json`, serialize(orderedExtra));
+  }
   // 旧 Supabase が返していた形（[{"id":1,"version":N}]）に合わせる。
   // iOS 側の Version 型は id を必須にしているため、省くとデコードに失敗する。
-  writeFileSync(`${OUT_DIR}/version.json`, JSON.stringify([{ id: 1, version: state.version }]));
+  // extraVersion は増やすだけなので、知らないアプリは今までどおり version だけ読む。
+  // 0 は「エクストラはまだ揃っていない」＝取りに行かなくてよい、の意。
+  writeFileSync(
+    `${OUT_DIR}/version.json`,
+    JSON.stringify([{ id: 1, version: state.version, extraVersion: state.extraVersion ?? 0 }]),
+  );
 
   // 大会結果は別管理（data/events.json）。カード巡回とは無関係にそのまま配信へ流す。
   if (existsSync(EVENTS)) {
     writeFileSync(`${OUT_DIR}/events.json`, JSON.stringify(readJson<unknown[]>(EVENTS, [])));
   }
 
-  if (incomplete) {
-    console.log(`未完了: 全 ${ordered.length} 件を保存、version は ${state.version} のまま据え置き`);
+  const extraNote =
+    orderedExtra.length > 0 || existsSync(MASTER_EXTRA)
+      ? ` / エクストラ ${orderedExtra.length} 件, extraVersion=${state.extraVersion ?? 0}${extraIncomplete ? "（未完了）" : ""}`
+      : "";
+
+  if (standardIncomplete) {
+    console.log(
+      `未完了: スタンダード ${ordered.length} 件を保存、version は ${state.version} のまま据え置き${extraNote}`,
+    );
     if (blocked) process.exitCode = 75; // EX_TEMPFAIL: 再実行すれば進むことを CI に伝える
     return;
   }
@@ -246,9 +347,10 @@ async function main(): Promise<void> {
   const added = ordered.length - master.length;
   console.log(
     changed || state.pendingBump
-      ? `更新あり: 全 ${ordered.length} 件（${added >= 0 ? "+" : ""}${added}）, version=${state.version}`
-      : `更新なし: 全 ${ordered.length} 件, version=${state.version}`,
+      ? `更新あり: スタンダード ${ordered.length} 件（${added >= 0 ? "+" : ""}${added}）, version=${state.version}${extraNote}`
+      : `更新なし: スタンダード ${ordered.length} 件, version=${state.version}${extraNote}`,
   );
+  if (blocked) process.exitCode = 75;
 }
 
 main().catch((err) => {

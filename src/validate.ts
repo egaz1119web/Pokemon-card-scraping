@@ -60,8 +60,8 @@ async function main(): Promise<void> {
     const got = await fetchCard(entry, want.sortId);
 
     for (const key of CARD_KEYS) {
-      // sortId は並び順、standard は一覧との突き合わせで決まる値。旧データには無い。
-      if (key === "sortId" || key === "standard") continue;
+      // sortId は並び順、standard / extra は一覧との突き合わせで決まる値。旧データには無い。
+      if (key === "sortId" || key === "standard" || key === "extra") continue;
       const a = String(want[key] ?? "");
       const b = String(got[key] ?? "");
       if (a === b) {
