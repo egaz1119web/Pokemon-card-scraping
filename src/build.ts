@@ -323,6 +323,8 @@ async function main(): Promise<void> {
   const extraChanged = serialize(extraMaster) !== serialize(orderedExtra);
 
   const state = readJson<State>(STATE, { version: 47, updatedAt: "", pendingBump: false });
+  // updatedAt 以外の中身を控えておく。下で「この回に何か動いたか」を見るのに使う。
+  const stateBefore = JSON.stringify({ ...state, updatedAt: "" });
 
   // 中途半端な状態でバージョンを上げると、アプリが不完全なデータを全件ダウンロードしてしまう。
   // 取り切るまでは master に書き足すだけにして、完走した回にまとめて 1 つ上げる。
@@ -345,7 +347,14 @@ async function main(): Promise<void> {
   if (trackProgress && !standardIncomplete && !extraIncomplete) {
     rmSync(REFRESH_PROGRESS, { force: true });
   }
-  state.updatedAt = new Date().toISOString();
+  // 何か動いた回だけ updatedAt を進める。無条件に書くと、カードに変化が無い日も
+  // data/state.json だけ差分が出る。ワークフローの変更判定は data と public の差分を
+  // 見ているので、空のコミットが毎晩積まれ、Discord にも中身の伴わない
+  // 「カードデータを更新しました」が飛ぶ。実際 v52・v53 でそうなっていた。
+  // events.ts では同じ理由で既にこうしてある。
+  if (changed || extraChanged || JSON.stringify({ ...state, updatedAt: "" }) !== stateBefore) {
+    state.updatedAt = new Date().toISOString();
+  }
 
   mkdirSync(OUT_DIR, { recursive: true });
   writeLineDelimitedArray(MASTER, ordered);
