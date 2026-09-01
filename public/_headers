@@ -10,10 +10,16 @@
   Cache-Control: public, max-age=600, must-revalidate
   Access-Control-Allow-Origin: *
 
-# エクストラは 8MB あるうえ、エクストラを使う人が明示的に取りに行くだけの
-# ファイル。中身もほとんど動かないので cards.json より長めに持たせる。
+# エクストラは 8MB あるが、version.json より長く持たせてはいけない。
+# 長くすると「version.json は新しい版を指しているのに、実ファイルは
+# まだ古い」という時間帯ができる。アプリはその古い中身を新しい版として
+# 控えるので、次に版が上がるまで直らない。実際 v55 の配信直後に
+# この状態を踏んだ（version.json は 55 なのに中身は 54 のまま）。
+#
+# 短くしても転送量は増えない。must-revalidate と ETag が付いているので、
+# 中身が変わっていなければ 304 で終わる。
 /cards-extra.json
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: public, max-age=300, must-revalidate
   Access-Control-Allow-Origin: *
 
 /events.json
