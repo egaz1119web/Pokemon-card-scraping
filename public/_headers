@@ -1,23 +1,24 @@
 # 配信のキャッシュ制御。
 # version.json はカード更新の検知に使うので短め。
-# cards.json は 5MB あるので少し長めに持たせ、あとは ETag による再検証にまかせる。
+# カード本体はどれも version.json より長く持たせてはいけない（下の理由）。
 # events.json は毎起動で読み直す前提。ETag が付くので、変化が無ければ 304 で済む。
 /version.json
   Cache-Control: public, max-age=300, must-revalidate
   Access-Control-Allow-Origin: *
 
-/cards.json
-  Cache-Control: public, max-age=600, must-revalidate
-  Access-Control-Allow-Origin: *
-
-# エクストラは 8MB あるが、version.json より長く持たせてはいけない。
-# 長くすると「version.json は新しい版を指しているのに、実ファイルは
-# まだ古い」という時間帯ができる。アプリはその古い中身を新しい版として
-# 控えるので、次に版が上がるまで直らない。実際 v55 の配信直後に
-# この状態を踏んだ（version.json は 55 なのに中身は 54 のまま）。
+# カード本体は 5MB / 8MB あるので長く持たせたくなるが、version.json より
+# 長くしてはいけない。長くすると「version.json は新しい版を指しているのに、
+# 実ファイルはまだ古い」という時間帯ができる。アプリはその古い中身を
+# 新しい版として控えるので、次に版が上がるまで直らない。実際 v55 の
+# 配信直後にエクストラでこの状態を踏んだ（version.json は 55 なのに
+# 中身は 54 のまま）。
 #
 # 短くしても転送量は増えない。must-revalidate と ETag が付いているので、
 # 中身が変わっていなければ 304 で終わる。
+/cards.json
+  Cache-Control: public, max-age=300, must-revalidate
+  Access-Control-Allow-Origin: *
+
 /cards-extra.json
   Cache-Control: public, max-age=300, must-revalidate
   Access-Control-Allow-Origin: *
