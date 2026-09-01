@@ -1,5 +1,6 @@
 {
-  "version": 53,
-  "updatedAt": "2026-08-31T13:31:36.917Z",
-  "pendingBump": true
+  "version": 54,
+  "updatedAt": "2026-09-01T02:45:26.664Z",
+  "pendingBump": false,
+  "extraPendingBump": true
 }
