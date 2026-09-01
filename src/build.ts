@@ -54,10 +54,33 @@ const REFRESH_IDS = (process.env.REFRESH_IDS ?? "")
 /** エクストラを触らない安全弁。スタンダードだけ回したいときに EXTRA=0。 */
 const WITH_EXTRA = process.env.EXTRA !== "0";
 
-/** 本文に HTML タグや \r が残っている＝旧パーサの取りこぼし */
+/**
+ * 表に出る文字列に HTML の残骸がある＝古いパーサで取ったレコード。
+ *
+ * 見るのは本文だけでは足りない。実体参照を復号していなかった時期のものは
+ * カード名（「レシラム&amp;リザードンGX」）と収録名に残っており、
+ * メガシンカ・プリズムスターの記号 <span> も同じく生のまま入っている。
+ */
 function hasLegacyArtifacts(card: CardRecord): boolean {
-  const fields = [card.ability, card.tech1Ability, card.tech2Ability, card.trainerAbility];
-  return fields.some((v) => v != null && (v.includes("<") || v.includes("\r")));
+  const fields = [
+    card.nameJp,
+    card.pack,
+    card.illust,
+    card.abilityName,
+    card.ability,
+    card.tech1Name,
+    card.tech1Ability,
+    card.tech2Name,
+    card.tech2Ability,
+    card.trainerAbility,
+    card.evoList,
+    card.evoType,
+  ];
+  return fields.some(
+    (v) =>
+      v != null &&
+      (v.includes("<") || v.includes("\r") || /&(#\d+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/.test(v)),
+  );
 }
 
 interface RefreshProgress {

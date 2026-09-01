@@ -1,4 +1,4 @@
-import { changeEneName, cleanText } from "./energy.js";
+import { changeEneName, toText } from "./energy.js";
 import { fetchText, ORIGIN } from "./http.js";
 import type { CardRecord, ListEntry } from "./types.js";
 import { cardIdOf } from "./list.js";
@@ -221,25 +221,27 @@ export function parseDetail(html: string, entry: ListEntry, sortId: number): Car
 
   }
 
+  // 表に出る文字列はすべて toText を通す。以前は本文だけだったので、
+  // カード名・収録名・イラストレーター名に実体参照や記号 <span> が残っていた。
   return {
-    nameJp: entry.cardNameAltText,
+    nameJp: toText(entry.cardNameAltText),
     imageUrl: entry.cardThumbFile,
     type,
-    pack,
-    abilityName,
-    ability: cleanText(changeEneName(ability)),
-    tech1Name,
-    tech1Ability: cleanText(changeEneName(tech1Ability)),
-    tech2Name,
-    tech2Ability: cleanText(changeEneName(tech2Ability)),
-    trainerAbility: cleanText(changeEneName(trainerAbility)),
-    evoList: toBracketList(dropHtmlNoise(evoList)),
-    illust,
+    pack: toText(pack),
+    abilityName: toText(abilityName),
+    ability: toText(ability),
+    tech1Name: toText(tech1Name),
+    tech1Ability: toText(tech1Ability),
+    tech2Name: toText(tech2Name),
+    tech2Ability: toText(tech2Ability),
+    trainerAbility: toText(trainerAbility),
+    evoList: toBracketList(dropHtmlNoise(evoList).map(toText)),
+    illust: toText(illust),
     cardId: cardIdOf(entry),
     sortId,
     pokemonType,
     rare,
-    evoType,
+    evoType: toText(evoType),
     attribute: toBracketList([...new Set(attribute)]),
     // 詳細ページからは分からない。build.ts が一覧と突き合わせて付け直す。
     standard: false,
