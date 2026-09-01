@@ -16,6 +16,9 @@ const ENERGY_LABELS: [string, string][] = [
   ["dragon", "ドラゴン"],
   ["electric", "雷"],
   ["psychic", "超"],
+  // フェアリーは XY〜SM のカードにしか出てこないため、スタンダードだけを
+  // 見ていた間は必要なかった。エクストラを取り込むと 700 件ほど該当する。
+  ["fairy", "フェアリー"],
 ];
 
 export function changeEneName(text: string): string {

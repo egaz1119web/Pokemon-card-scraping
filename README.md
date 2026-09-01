@@ -9,7 +9,7 @@ PokemonCardTools アプリへ配信するカードデータを生成するリポ
 ```
 GitHub Actions (毎日 03:10 JST)
   └ src/build.ts … pokemon-card.com を巡回して data/cards.json を更新
-      └ public/{cards.json, version.json} を生成しコミット
+      └ public/{cards.json, cards-extra.json, version.json} を生成しコミット
           └ Cloudflare Pages が public/ を配信
               └ アプリが取得
 ```
@@ -69,10 +69,65 @@ standard = 今の XY 検索結果の一覧に載っているか
 引き継ぐため、同じ収録の中に true と false が混ざる
 （例: テラスタルフェスex は 173 / 208、ブラックボルトは 173 / 81）。
 
+## エクストラ
+
+エクストラ（BW 以降）は 20,798 件あり、スタンダードの積み上げ 8,572 件の
+2.4 倍になる。1 本の `cards.json` に押し込むと 14MB になって、
+**エクストラを使わない人と旧バージョンのアプリまで巻き込む**。
+そのため配信を 2 本に分ける。
+
+| ファイル | 中身 | 件数 |
+|---|---|---|
+| `cards.json` | スタンダードの積み上げ（今までどおり） | 8,572 |
+| `cards-extra.json` | エクストラにしか無いカード | 12,893 |
+
+**2 つのファイルに同じカードは入らない。** アプリは cards.json を今までどおり
+読み、エクストラを使う人だけ cards-extra.json を足して和集合にする。
+エクストラのカードが後からスタンダードへ入ってきたら、日次の実行が
+`cards.json` 側へ移し、`cards-extra.json` から外す。
+
+`extra` フラグは `standard` と同じ作りで、BW 検索の一覧に載っているかを
+毎回付け直す。cards.json の 8,572 件のうち 7,905 件が `extra: true`。
+残りの 667 件はどちらの検索にも出てこないカードで、`standard` も `extra` も
+false のまま保持され続ける。
+
+### 版を分ける理由
+
+エクストラの初回取り込みは 12,893 件、1 秒 1 件なので日次の 1000 件では
+13 日かかる。版が 1 つしか無いと、その間ずっと「未完了」扱いになって
+**スタンダードの新しいカードもアプリに届かなくなる**。
+
+そこで `state.json` に `extraVersion` を分けて持ち、取り切れたかどうかも
+スタンダードとエクストラで別々に数えている。エクストラの取り込み中でも
+スタンダードの版は今までどおり上がる。
+
+`extraVersion: 0` は「まだ揃っていない」の意。アプリはこの間 cards-extra.json を
+取りに行かなくてよい。
+
+初回の取り込みを急ぐなら、`workflow_dispatch` の `max_fetch` を上げて回す。
+1 件 1 秒なのでジョブの上限 330 分に収まるのは 15,000 件あたりまで。
+
+### 種別（attribute）
+
+`attribute` は「特別なルール」の本文から割り出している。スタンダードには
+ex・メガシンカ・テラスタルしか無いので長らくそれで足りていたが、
+エクストラには GX / V / VMAX / VSTAR / V-UNION / TAG TEAM / BREAK /
+プリズムスター / 旧 EX がまるごと入ってくる。
+
+名前の末尾で判定していないのは、名前に印が出ないもの（かがやくポケモン、
+ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードもあるため。
+
+`pokemonType` にフェアリーを足したのも同じ理由で、XY〜SM のカードにしか
+出てこないため今まで必要が無かった。無いままだとタイプが
+`<spanclass="icon-fairyicon"></span>` という壊れた文字列になる。
+
+**アプリ側の選択肢にも同じ値を足すこと。** 足さないと絞り込みに出てこない。
+
 ## 出力
 
-- `public/version.json` … `[{"version":48}]`
-- `public/cards.json` … カード全件の配列
+- `public/version.json` … `[{"id":1,"version":54,"extraVersion":0}]`
+- `public/cards.json` … スタンダードの積み上げ全件の配列
+- `public/cards-extra.json` … エクストラにしか無いカードの配列
 
 いずれも旧 Supabase（PostgREST）と同じ配列形式にしてあるので、
 アプリ側の `VersionResponse` / `CardDetailResponse` は変更不要。
@@ -98,6 +153,8 @@ npm run typecheck
 | `MAX_FETCH` | 1000 | 1 回の実行で取得する上限 |
 | `REFRESH_ALL` | - | `1` で全カードを取得し直す |
 | `REFRESH_DIRTY` | - | `1` で旧パーサの取りこぼしが残るカードだけ取得し直す |
+| `REFRESH_IDS` | - | 指定した cardId だけ取り直す（カンマ区切り） |
+| `EXTRA` | - | `0` でエクストラを触らない（スタンダードだけ回す） |
 | `SAMPLE_SIZE` | 150 | validate の標本数 |
 
 ## アクセス制限について

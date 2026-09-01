@@ -30,6 +30,14 @@ function betweenAll(source: string, from: string, to: string): string[] {
 }
 
 /**
+ * 途中で改行された本文をつなぐ。
+ *
+ * 公式サイトは `<br />` と `<br/>` を混在させている（トレーナーズの本文は前者、
+ * 「特別なルール」は後者）。どちらでも次の行へ続いているとみなす。
+ */
+const CONTINUES = /<br\s*\/?>$/;
+
+/**
  * トレーナーズ系の本文は 1 行に収まらず <br /> で次行へ続くことがある。
  * 続く限り連結してから <p>...</p> を取り出す。
  */
@@ -43,18 +51,62 @@ function joinWrappedText(lines: string[], startIndex: number): string {
     if (line.trim() === "" || line.includes("<h2")) i += 1;
     else break;
   }
-  let buf = lines[i] ?? "";
-  while (buf.trimEnd().endsWith("<br />") && i + 1 < lines.length) {
+  return between(joinContinued(lines, i), "<p>", "</p>");
+}
+
+/** startIndex の行から、続きを示す <br> で終わらなくなるまで連結する。 */
+function joinContinued(lines: string[], startIndex: number): string {
+  let buf = lines[startIndex] ?? "";
+  let i = startIndex;
+  while (CONTINUES.test(buf.trimEnd()) && i + 1 < lines.length) {
     i += 1;
     buf += lines[i];
   }
-  return between(buf, "<p>", "</p>");
+  return buf;
 }
+
+/**
+ * 「特別なルール」の本文から、カードの種別を割り出す。
+ *
+ * 判定はカードに書かれているルール文そのままを見る。名前の末尾（GX / V など）で
+ * 決めないのは、「ゾロアークGX」のように名前だけ似ていて種別が違うカードや、
+ * 名前に印が出ないカード（かがやくポケモン・ACE SPEC）があるため。
+ *
+ * スタンダードには ex・メガシンカ・テラスタルしか無いので長らくこれで足りていたが、
+ * エクストラには BW〜SM 期の種別がまるごと入ってくる。
+ */
+const SPECIAL_RULES: [RegExp, string[]][] = [
+  // 旧「M進化」と、SV の「メガシンカex」。表記が違うだけで同じもの。
+  [/M進化ポケモン|メガシンカ/, ["メガシンカ"]],
+  [/exがきぜつ/, ["ポケモンex"]],
+  // 大文字の EX は BW〜XY の別物。小文字の ex とは分けて持つ。
+  [/ポケモンEXがきぜつ/, ["ポケモンEX"]],
+  [/ポケモンGXがきぜつ/, ["ポケモンGX"]],
+  // TAG TEAM のルール文は GX に触れないが、カードとしてはどれも GX なので両方付ける。
+  [/TAG TEAMがきぜつ/, ["TAG TEAM", "ポケモンGX"]],
+  [/ポケモンVがきぜつ/, ["ポケモンV"]],
+  [/ポケモンVMAXがきぜつ/, ["ポケモンVMAX"]],
+  [/ポケモンVSTARがきぜつ/, ["ポケモンVSTAR"]],
+  [/ポケモンV-UNIONがきぜつ/, ["ポケモンV-UNION"]],
+  [/BREAK進化する前の/, ["ポケモンBREAK"]],
+  [/（プリズムスター）のカード/, ["プリズムスター"]],
+  [/かがやくポケモンは、デッキに1枚しか/, ["かがやくポケモン"]],
+  [/ACE SPECのカードは、デッキに1枚しか/, ["ACE SPEC"]],
+];
 
 /** GAS 版の evoList / attribute は "[a,b,c]" という独自の文字列表現。Room と検索がこの形に依存している。 */
 function toBracketList(items: string[]): string {
-  const cleaned = items.filter((el) => !el.includes("=") && !el.includes("</div>") && !el.includes(" "));
-  return `[${cleaned.join(",")}]`;
+  return `[${items.join(",")}]`;
+}
+
+/**
+ * 進化リンクの切り出しに混ざる HTML の残骸を落とす。
+ *
+ * 空白を含むものを捨てているのはタグの属性を弾くため。attribute 側は
+ * こちらを通さない ―― 「TAG TEAM」「ACE SPEC」が空白ごと消えてしまう。
+ */
+function dropHtmlNoise(items: string[]): string[] {
+  return items.filter((el) => !el.includes("=") && !el.includes("</div>") && !el.includes(" "));
 }
 
 /**
@@ -154,9 +206,13 @@ export function parseDetail(html: string, entry: ListEntry, sortId: number): Car
     }
 
     if (line.includes('"mt20">特別なルール')) {
-      const body = lines[i + 1] ?? "";
-      if (body.includes("メガシンカ")) attribute.push("メガシンカ");
-      if (body.includes("ex")) attribute.push("ポケモンex");
+      // メガシンカや V-UNION はルールが 2 文あり、<br/> で次の行へ続く。
+      // 1 行目しか見ないと「M進化ポケモンになったとき」だけを読んで
+      // ポケモンEX の判定を落とす。
+      const body = joinContinued(lines, i + 1);
+      for (const [pattern, labels] of SPECIAL_RULES) {
+        if (pattern.test(body)) attribute.push(...labels);
+      }
     }
 
     if (line.includes("このポケモンは、ベンチにいるかぎり、ワザのダメージを受けない。")) {
@@ -177,7 +233,7 @@ export function parseDetail(html: string, entry: ListEntry, sortId: number): Car
     tech2Name,
     tech2Ability: cleanText(changeEneName(tech2Ability)),
     trainerAbility: cleanText(changeEneName(trainerAbility)),
-    evoList: toBracketList(evoList),
+    evoList: toBracketList(dropHtmlNoise(evoList)),
     illust,
     cardId: cardIdOf(entry),
     sortId,
@@ -187,6 +243,7 @@ export function parseDetail(html: string, entry: ListEntry, sortId: number): Car
     attribute: toBracketList([...new Set(attribute)]),
     // 詳細ページからは分からない。build.ts が一覧と突き合わせて付け直す。
     standard: false,
+    extra: false,
   };
 }
 

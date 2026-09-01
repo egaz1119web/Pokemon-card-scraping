@@ -35,6 +35,14 @@ export interface CardRecord {
    * 「一覧に載っているか」だけを渡す。build.ts が毎回付け直す。
    */
   standard: boolean;
+  /**
+   * いま公式のエクストラ検索（regulation_sidebar_form=BW）に出てくるか。
+   *
+   * standard と同じく毎回付け直す。エクストラは落ちない建前だが、
+   * 公式が一覧から下げるカードは実際にある（現配信の 667 件がそれで、
+   * どのレギュレーションの検索にも出てこない）。判断はアプリ側に渡す。
+   */
+  extra: boolean;
 }
 
 /** resultAPI.php の cardList 要素 */
@@ -51,13 +59,23 @@ export interface State {
   updatedAt: string;
   /** 分割実行の途中で変更が入ったことを覚えておき、完走した回にまとめてバージョンを上げる */
   pendingBump?: boolean;
+  /**
+   * cards-extra.json の版。スタンダードとは独立して数える。
+   *
+   * 分けているのは、エクストラの初回取り込みに 1 万件以上かかるため。
+   * 版を共有していると、その間ずっと「未完了」になってスタンダードの
+   * 新しいカードもアプリに届かなくなる。
+   * 0 は「まだ揃っていない」＝アプリは取りに行かなくてよい、の意。
+   */
+  extraVersion?: number;
+  extraPendingBump?: boolean;
 }
 
 export const CARD_KEYS: (keyof CardRecord)[] = [
   "nameJp", "imageUrl", "type", "pack", "abilityName", "ability",
   "tech1Name", "tech1Ability", "tech2Name", "tech2Ability", "trainerAbility",
   "evoList", "illust", "cardId", "sortId", "pokemonType", "rare", "evoType", "attribute",
-  "standard",
+  "standard", "extra",
 ];
 
 /** キー順を固定したうえでレコードを作り直す */

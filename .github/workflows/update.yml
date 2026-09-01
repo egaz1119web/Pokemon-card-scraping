@@ -7,9 +7,19 @@ on:
   workflow_dispatch:
     inputs:
       refresh_all:
-        description: "既存カードもすべて取得し直す（パース修正の反映用）"
+        # 「取得し直す」とだけ書くと毎回ゼロから始まるように読めるが、実際は
+        # data/refresh-progress.json に進捗が残っていて続きから走る。
+        # 取り切るまでは毎回チェックを入れること。外すと進捗が読まれない。
+        description: "全件の取り直しを進める（前回の続きから。取り切るまで毎回チェック）"
         type: boolean
         default: false
+      max_fetch:
+        # エクストラの初回取り込みは 1 万件を超える。日次の 1000 件のままだと
+        # 13 日かかるので、手で回すときだけ上げられるようにしておく。
+        # 1 件 1 秒なので、ジョブの上限 330 分に収まるのは 15,000 件あたりまで。
+        description: "1 回の実行で取得する上限（1 件 1 秒。既定 1000）"
+        type: string
+        default: "1000"
 
 # 同時に走ると data/cards.json の書き込みが競合するため直列化する
 concurrency:
@@ -41,7 +51,7 @@ jobs:
         env:
           CONCURRENCY: "1"
           DELAY_MS: "1000"
-          MAX_FETCH: "1000"
+          MAX_FETCH: ${{ inputs.max_fetch || '1000' }}
           REFRESH_ALL: ${{ inputs.refresh_all && '1' || '0' }}
         run: |
           set +e
@@ -65,13 +75,28 @@ jobs:
           fi
           version=$(node -p "require('./data/state.json').version")
           count=$(node -p "require('./data/cards.json').length")
+          # エクストラはまだ揃っていない間 extraVersion が 0 のままなので、
+          # 件数だけをコミットメッセージに添える。
+          extra=$(node -p "const fs=require('fs');fs.existsSync('./data/cards-extra.json')?require('./data/cards-extra.json').length:0")
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data public
           suffix=""
           if [ "${{ steps.build.outputs.partial }}" = "true" ]; then suffix=" [途中]"; fi
-          git commit -m "カードデータ更新 v${version} (${count}件)${suffix}"
-          git push
+          extra_note=""
+          if [ "$extra" -gt 0 ]; then extra_note=" +エクストラ${extra}件"; fi
+          git commit -m "カードデータ更新 v${version} (${count}件${extra_note})${suffix}"
+          # 全件更新は 1 回が数時間かかる。その間にこのブランチへ別のコミットが
+          # 入っていると push が弾かれ、取得済みのデータがランナーごと消える。
+          # 実際 2026-08-31 の 8,000 件の実行がこれで丸ごと無駄になった。
+          # データの変更は data/ と public/ にしか無いので、取り込み直して押す。
+          pushed=false
+          for _ in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi
+            echo "::warning::push が弾かれた。取り込み直して再試行する。"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+          if [ "$pushed" != true ]; then exit 1; fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "count=${count}" >> "$GITHUB_OUTPUT"

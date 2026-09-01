@@ -10,6 +10,12 @@
   Cache-Control: public, max-age=600, must-revalidate
   Access-Control-Allow-Origin: *
 
+# エクストラは 8MB あるうえ、エクストラを使う人が明示的に取りに行くだけの
+# ファイル。中身もほとんど動かないので cards.json より長めに持たせる。
+/cards-extra.json
+  Cache-Control: public, max-age=3600, must-revalidate
+  Access-Control-Allow-Origin: *
+
 /events.json
   Cache-Control: public, max-age=0, must-revalidate
   Access-Control-Allow-Origin: *
