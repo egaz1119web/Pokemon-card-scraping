@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["W2MGTX4423.d.egaz.pokepokedeck"],
+        "components": [
+          { "/": "/d", "comment": "デッキ共有リンク" },
+          { "/": "/d/", "comment": "Cloudflare が /d を正規化した形" }
+        ]
+      }
+    ]
+  }
+}

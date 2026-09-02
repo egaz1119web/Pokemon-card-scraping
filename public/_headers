@@ -42,3 +42,10 @@
 /.well-known/assetlinks.json
   Cache-Control: public, max-age=300, must-revalidate
   Content-Type: application/json
+
+# iOS の Universal Links の検証で読まれる。
+# **拡張子が無いので、指定しないと application/octet-stream で出てしまう。**
+# Apple は application/json でないと受け付けないため、ここで明示する。
+/.well-known/apple-app-site-association
+  Cache-Control: public, max-age=300, must-revalidate
+  Content-Type: application/json
