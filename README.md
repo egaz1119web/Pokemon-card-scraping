@@ -360,7 +360,7 @@ Cloudflare のダッシュボードから **Workers & Pages → Create → Conne
 
 ```jsonc
 {
-  "name": "pokemon-card-scraping",
+  "name": "pokedeck",
   "compatibility_date": "2026-08-24",
   "assets": { "directory": "./public" }
 }
@@ -370,7 +370,27 @@ Cloudflare のダッシュボードから **Workers & Pages → Create → Conne
 Workers Builds ではダッシュボード側の名前が優先されるが、ローカルから
 `wrangler deploy` したときに別の Worker を作ってしまうため揃えておく。
 
-配信先: `https://pokemon-card-scraping.op-sarada.workers.dev/`
+配信先: `https://pokedeck.op-sarada.workers.dev/`
+
+### 旧ホスト（pokemon-card-scraping）
+
+**Worker に改名は無い。**名前を変えた `wrangler deploy` は別の Worker を作るだけで、
+旧ホストは空になる。Worker 名はそのまま `workers.dev` のホスト名になり、
+デッキ共有リンクに毎回出るので `pokedeck` へ移した。
+
+配信中のアプリはホストを直書きしている（Android の `ApiProvider`、
+iOS の `ArticleListAPIClient`）ため、旧ホストが空になるとカードデータの
+更新が止まる。そこで旧ホストには `redirect/` の Worker を置き、
+新ホストへ 301 で飛ばしている。OkHttp も URLSession も既定で
+リダイレクトを追うので、古い版のアプリもそのまま取り続けられる。
+
+```bash
+npx wrangler deploy --config redirect/wrangler.jsonc
+```
+
+**旧 Worker は Git 連携から外しておくこと。**繋いだままだと次のビルドで
+`public/` の配信に戻ってしまう。置くのは一度きりで、以後は触らない。
+旧バージョンのアプリが世の中から消えたら、Worker ごと消してよい。
 
 静的アセットへのリクエストは無料かつ無制限で、帯域の課金も無い。
 `public/_headers` のキャッシュ指定もそのまま効く。

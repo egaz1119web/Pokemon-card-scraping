@@ -58,7 +58,7 @@ for (const { label, code, expect } of goldens) {
 }
 
 test('60 枚のデッキでも URL が QR に収まる長さ', () => {
-  const url = `https://pokemon-card-scraping.op-sarada.workers.dev/d?c=${goldens[0].code}`;
+  const url = `https://pokedeck.op-sarada.workers.dev/d?c=${goldens[0].code}`;
   // QR の版 10（バイトモード・誤り訂正 M）で 213 バイト。余裕を見て 200 で切る。
   assert.ok(url.length < 200, `長すぎる: ${url.length}`);
 });

@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  // 旧ホストの Worker。中身は新ホストへの 301 だけ（redirect/index.js）。
+  //
+  // **この Worker は Git 連携から外しておくこと。**
+  // 繋いだままだと、次のビルドで public/ の配信に戻ってしまう。
+  // 置くのは一度きりなので、手元から次のコマンドで送る:
+  //
+  //   npx wrangler deploy --config redirect/wrangler.jsonc
+  //
+  "name": "pokemon-card-scraping",
+  "main": "index.js",
+  "compatibility_date": "2026-08-24"
+}
