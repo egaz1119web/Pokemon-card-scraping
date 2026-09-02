@@ -163,7 +163,10 @@ import { decode } from './share-code.js';
 // ここは intent:// に渡すぶんだけ。App Store の方は国を指定しない形にしてある
 // （開いた人の地域のストアへ Apple 側が振り分ける）。
 const PLAY_URL = 'https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools';
+const APP_STORE_URL = 'https://apps.apple.com/app/id6747426098';
 const PACKAGE = 'jp.egaz.pokemoncardtools';
+/// アプリを直に呼ぶときの合図。Android / iOS の両方で同じ綴り。
+const APP_SCHEME = 'pokedeck';
 const IMAGE_BASE = 'https://www.pokemon-card.com/assets/images/card_images/large/';
 
 // アプリの PokemonType と同じ色。デッキの色みをページにも移す。
@@ -278,20 +281,33 @@ function renderCta(code) {
     $('appstore').classList.remove('hidden');
   }
 
-  // 「アプリで開く」は Android だけ。iPhone 版はまだリンクを受け取れないので、
-  // 押しても何も起きないボタンは置かない（iOS 側が対応したらここも開ける）。
-  if (isAndroid) {
+  // 「アプリで開く」は Android と iPhone に出す。パソコンには出さない。
+  //
+  // どちらもリンクを踏めば本来はアプリが直接開く（App Links / Universal Links）。
+  // ただし LINE や X の中のブラウザはそれを無視してこのページを開いてしまう。
+  // そこから来た人のための逃げ道なので、素の合図（pokedeck://）を叩く。
+  if (isAndroid || isIOS) {
     $('open').classList.remove('hidden');
     $('open').addEventListener('click', () => {
-      // Chrome の intent:// なら、アプリが無いときの行き先まで一緒に渡せる。
-      // 自前で時間を測って振り分けるより確実。
-      location.href =
-        `intent://d?c=${code}#Intent;scheme=pokedeck;package=${PACKAGE};` +
-        `S.browser_fallback_url=${encodeURIComponent(PLAY_URL)};end`;
+      if (isAndroid) {
+        // Chrome の intent:// なら、アプリが無いときの行き先まで一緒に渡せる。
+        // 自前で時間を測って振り分けるより確実。
+        location.href =
+          `intent://d?c=${code}#Intent;scheme=pokedeck;package=${PACKAGE};` +
+          `S.browser_fallback_url=${encodeURIComponent(PLAY_URL)};end`;
+        return;
+      }
+      // iOS には intent:// が無いので、呼んでみて何も起きなければ店へ送る。
+      // アプリが開けばこの頁は隠れるので、下のタイマーは動かない。
+      const timer = setTimeout(() => {
+        if (!document.hidden) location.href = APP_STORE_URL;
+      }, 1500);
+      window.addEventListener('pagehide', () => clearTimeout(timer), { once: true });
+      location.href = `${APP_SCHEME}://d?c=${code}`;
     });
   }
 
-  $('note').textContent = isAndroid
+  $('note').textContent = (isAndroid || isIOS)
     ? 'アプリを入れている人は「アプリで開く」からそのまま取り込めます。取り込んでも、送った人のデッキは変わりません。'
     : 'アプリを入れると、このデッキをそのまま自分のデッキとして取り込めます。';
   $('note').classList.remove('hidden');
