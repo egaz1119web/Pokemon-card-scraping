@@ -1,10 +1,13 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "jp.egaz.pokemoncardtools",
       "sha256_cert_fingerprints": [
+        "90:6D:1D:28:08:7B:C1:9A:63:A2:81:D2:01:1A:60:37:B1:D2:03:2A:5D:CE:91:8E:B3:E0:B5:92:86:0C:47:73",
         "A5:C9:C2:10:B2:5E:E5:C7:B8:19:9F:F1:0B:0A:D6:B4:4A:42:82:27:87:7C:21:B6:72:14:13:DF:AD:F9:84:F1"
       ]
     }
