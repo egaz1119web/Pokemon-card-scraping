@@ -139,13 +139,11 @@
   </header>
 
   <div class="cta hidden" id="cta">
-    <button class="btn primary" id="open">アプリで開く<small>そのまま自分のデッキになります</small></button>
-    <a class="btn" id="install" href="https://play.google.com/apps/testing/jp.egaz.pokemoncardtools" target="_blank" rel="noopener">アプリを入れる<small>Google Play（テスト配信中）</small></a>
+    <button class="btn primary hidden" id="open">アプリで開く<small>そのまま自分のデッキになります</small></button>
+    <a class="btn hidden" id="play" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">Google Play<small>Android 版 PokeDeck</small></a>
+    <a class="btn hidden" id="appstore" href="https://apps.apple.com/app/id6747426098" target="_blank" rel="noopener">App Store<small>iPhone 版 PokeDeck</small></a>
   </div>
-  <p class="note hidden" id="note">
-    アプリを入れている人は「アプリで開く」から取り込めます。
-    取り込んでも、送った人のデッキは変わりません。
-  </p>
+  <p class="note hidden" id="note"></p>
 
   <p class="warn hidden" id="warn"></p>
   <div id="sections"></div>
@@ -161,7 +159,10 @@
 <script type="module">
 import { decode } from './share-code.js';
 
-const PLAY_URL = 'https://play.google.com/apps/testing/jp.egaz.pokemoncardtools';
+// アプリが無いときの行き先。ストアへの入口は HTML 側の <a> が持っていて、
+// ここは intent:// に渡すぶんだけ。App Store の方は国を指定しない形にしてある
+// （開いた人の地域のストアへ Apple 側が振り分ける）。
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools';
 const PACKAGE = 'jp.egaz.pokemoncardtools';
 const IMAGE_BASE = 'https://www.pokemon-card.com/assets/images/card_images/large/';
 
@@ -253,28 +254,47 @@ function renderHead(deck) {
   $('meta').classList.remove('hidden');
 }
 
+/**
+ * 取り込みの導線。見ている端末で出し分ける。
+ *
+ * **アプリを入れている人は、そもそもこのページに来ない。**
+ * Android は App Links の検証が通っていればブラウザを挟まずアプリが開く。
+ * ここへ来たということは、アプリが無いか、検証が効いていないかのどちらか。
+ * だから店へ送る導線を主にして、「アプリで開く」はその取りこぼし用に置く。
+ */
 function renderCta(code) {
-  $('cta').classList.remove('hidden');
-  $('note').classList.remove('hidden');
+  const ua = navigator.userAgent;
+  const isAndroid = /Android/i.test(ua);
+  // iPadOS は Macintosh を名乗るので、触れる画面かどうかも見る。
+  const isIOS = /iPhone|iPod/i.test(ua) ||
+    (/iPad|Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
 
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  $('open').addEventListener('click', () => {
-    if (isAndroid) {
+  $('cta').classList.remove('hidden');
+  if (isAndroid) $('play').classList.remove('hidden');
+  else if (isIOS) $('appstore').classList.remove('hidden');
+  else {
+    // パソコンなど。どちらを使う人か分からないので両方出す。
+    $('play').classList.remove('hidden');
+    $('appstore').classList.remove('hidden');
+  }
+
+  // 「アプリで開く」は Android だけ。iPhone 版はまだリンクを受け取れないので、
+  // 押しても何も起きないボタンは置かない（iOS 側が対応したらここも開ける）。
+  if (isAndroid) {
+    $('open').classList.remove('hidden');
+    $('open').addEventListener('click', () => {
       // Chrome の intent:// なら、アプリが無いときの行き先まで一緒に渡せる。
       // 自前で時間を測って振り分けるより確実。
       location.href =
         `intent://d?c=${code}#Intent;scheme=pokedeck;package=${PACKAGE};` +
         `S.browser_fallback_url=${encodeURIComponent(PLAY_URL)};end`;
-      return;
-    }
-    // それ以外は素のスキームで呼んで、何も起きなければストアへ送る。
-    // アプリが開いていれば、この頁は隠れるので下のタイマーは動かない。
-    const timer = setTimeout(() => {
-      if (!document.hidden) location.href = PLAY_URL;
-    }, 1500);
-    window.addEventListener('pagehide', () => clearTimeout(timer), { once: true });
-    location.href = `pokedeck://d?c=${code}`;
-  });
+    });
+  }
+
+  $('note').textContent = isAndroid
+    ? 'アプリを入れている人は「アプリで開く」からそのまま取り込めます。取り込んでも、送った人のデッキは変わりません。'
+    : 'アプリを入れると、このデッキをそのまま自分のデッキとして取り込めます。';
+  $('note').classList.remove('hidden');
 }
 
 function renderCards(deck) {
