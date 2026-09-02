@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>共有されたデッキ ― PokeDeck</title>
+<meta name="description" content="PokeDeck で共有されたポケモンカードのデッキ。アプリを入れていれば、そのまま自分のデッキとして取り込めます。">
+<meta property="og:title" content="共有されたデッキ ― PokeDeck">
+<meta property="og:description" content="ポケモンカードのデッキが共有されました。アプリで開くとそのまま取り込めます。">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* 色と字はアプリ紹介ページ（web/index.html）と同じものを使う。
+     共有リンクを踏んだ人が最初に見る画面なので、別のサイトに見えては困る。 */
+  :root {
+    --bg: #0F0E15;
+    --surface: #1F1E2A;
+    --surface2: #171622;
+    --surface3: #292735;
+    --text: #F2F0F7;
+    --text2: #A9A5B8;
+    --text3: #6F6B80;
+    --accent: #C9B6FF;
+    --accent-strong: #A98BFF;
+    --gold: #F2C14E;
+    --line: rgba(255,255,255,0.08);
+    --deck: var(--accent-strong);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  .glow {
+    position: fixed; left: 50%; top: -320px;
+    width: 760px; height: 760px; margin-left: -380px;
+    border-radius: 50%; pointer-events: none; z-index: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--deck) 22%, transparent) 0%, rgba(15,14,21,0) 70%);
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 0 20px 64px; }
+
+  .eyebrow {
+    font-family: 'Sora', sans-serif; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.18em; color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  header.top { padding: 28px 0 8px; }
+  h1 {
+    font-weight: 900; font-size: 34px; line-height: 1.3;
+    margin: 12px 0 10px; text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+  .meta { display: flex; align-items: center; gap: 10px; color: var(--text2); font-weight: 700; font-size: 14px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--deck); flex: none; }
+  .count { font-family: 'Sora', sans-serif; font-variant-numeric: tabular-nums; }
+
+  /* 取り込みの導線。ここがこのページの用件なので、いちばん上に置く。 */
+  .cta { margin: 24px 0 8px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 24px; border-radius: 999px;
+    font-weight: 700; font-size: 15px;
+    border: 1px solid var(--line); background: var(--surface);
+    transition: transform .15s ease, border-color .15s ease;
+    cursor: pointer; font-family: inherit; color: inherit;
+  }
+  .btn:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent-strong), #7C5CFF);
+    color: #14121F; border: none;
+  }
+  .btn small { display: block; font-weight: 500; font-size: 11px; opacity: .8; }
+  .note { margin-top: 14px; font-size: 13px; line-height: 1.7; color: var(--text3); }
+
+  section { margin-top: 34px; }
+  .sec-head {
+    display: flex; align-items: baseline; gap: 10px;
+    margin: 0 4px 12px; font-weight: 700; font-size: 15px;
+  }
+  .sec-head .n { font-family: 'Sora', sans-serif; font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px 10px;
+    background: var(--surface2); border: 1px solid var(--line);
+    border-radius: 16px; padding: 12px 12px 22px;
+  }
+  @media (max-width: 460px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  .card { position: relative; }
+  .card img, .card .blank {
+    display: block; width: 100%; aspect-ratio: 5 / 7;
+    border-radius: 4px; background: var(--surface3);
+    object-fit: cover;
+  }
+  .card .blank {
+    display: grid; place-items: center; padding: 4px;
+    font-size: 9px; line-height: 1.3; color: var(--text3); text-align: center;
+  }
+  /* 枚数のバッジ。アプリのカード下端をまたぐ見せ方に合わせている。 */
+  .card .n {
+    position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 999px; background: #0B0A10; border: 1px solid var(--line);
+    font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 700;
+    display: grid; place-items: center; font-variant-numeric: tabular-nums;
+  }
+
+  .panel {
+    background: var(--surface2); border: 1px solid var(--line);
+    border-radius: 16px; padding: 22px; line-height: 1.8; color: var(--text2);
+  }
+  .panel strong { color: var(--text); }
+  .warn { color: var(--gold); font-size: 13px; margin: 0 4px 12px; line-height: 1.7; }
+
+  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--text3); font-size: 12px; line-height: 1.8; }
+  footer a { color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="glow" id="glow"></div>
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">PokeDeck</div>
+    <h1 id="title">デッキを読み込んでいます…</h1>
+    <div class="meta hidden" id="meta">
+      <span class="dot" id="dot"></span>
+      <span class="count" id="count"></span>
+    </div>
+  </header>
+
+  <div class="cta hidden" id="cta">
+    <button class="btn primary" id="open">アプリで開く<small>そのまま自分のデッキになります</small></button>
+    <a class="btn" id="install" href="https://play.google.com/apps/testing/jp.egaz.pokemoncardtools" target="_blank" rel="noopener">アプリを入れる<small>Google Play（テスト配信中）</small></a>
+  </div>
+  <p class="note hidden" id="note">
+    アプリを入れている人は「アプリで開く」から取り込めます。
+    取り込んでも、送った人のデッキは変わりません。
+  </p>
+
+  <p class="warn hidden" id="warn"></p>
+  <div id="sections"></div>
+
+  <div class="panel hidden" id="fallback"></div>
+
+  <footer>
+    <p>このページは PokeDeck で共有されたデッキを表示しています。デッキの中身はリンクそのものに入っていて、どこにも保存していません。</p>
+    <p>カード画像は <a href="https://www.pokemon-card.com/" target="_blank" rel="noopener">ポケモンカードゲーム公式サイト</a> のものです。</p>
+  </footer>
+</div>
+
+<script type="module">
+import { decode } from './share-code.js';
+
+const PLAY_URL = 'https://play.google.com/apps/testing/jp.egaz.pokemoncardtools';
+const PACKAGE = 'jp.egaz.pokemoncardtools';
+const IMAGE_BASE = 'https://www.pokemon-card.com/assets/images/card_images/large/';
+
+// アプリの PokemonType と同じ色。デッキの色みをページにも移す。
+const ENERGY_COLORS = {
+  reef: '#55B24E', fire: '#F0602B', water: '#3E8FE8', thunder: '#F5CF2A',
+  esper: '#A45BD1', fight: '#C9622E', dark: '#4A5670', metal: '#8C98A6',
+  fairy: '#E05C9C', dragon: '#B8963A', common: '#C4C8CF',
+};
+
+// アプリのデッキ詳細と同じ並び・同じ分け方。
+const SECTIONS = ['ポケモン', 'トレーナーズ', 'エネルギー', 'その他'];
+const TRAINER_ORDER = ['グッズ', 'どうぐ', 'サポート', 'スタジアム'];
+function classify(type) {
+  if (type === 'ポケモン') return 'ポケモン';
+  if (TRAINER_ORDER.includes(type)) return 'トレーナーズ';
+  if (['基本エネルギー', '特殊エネルギー', 'エネルギー'].includes(type)) return 'エネルギー';
+  return 'その他';
+}
+
+const $ = (id) => document.getElementById(id);
+
+function showFallback(html) {
+  $('title').textContent = 'デッキを開けませんでした';
+  $('fallback').innerHTML = html;
+  $('fallback').classList.remove('hidden');
+}
+
+/**
+ * カードの索引。スタンダードぶん（130KB ほど）だけ先に読む。
+ * 引けないカードがあったときにだけエクストラぶんを足しに行く。
+ * 最初から両方読むと 300KB を超えて、ほとんどの人には無駄になる。
+ */
+let index = null;
+async function loadIndex(url) {
+  const res = await fetch(url, { cache: 'force-cache' });
+  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  return res.json();
+}
+
+async function main() {
+  const code = new URLSearchParams(location.search).get('c');
+  if (!code) {
+    showFallback(
+      '<strong>リンクにデッキが入っていません。</strong><br>' +
+      'アドレスが途中で切れていないか確かめて、送ってくれた人にもう一度もらってください。'
+    );
+    return;
+  }
+
+  const deck = decode(code);
+  if (!deck) {
+    showFallback(
+      '<strong>リンクを読めませんでした。</strong><br>' +
+      'アドレスが途中で切れているか、PokeDeck の共有リンクではないようです。' +
+      'メッセージアプリで改行が入って切れていることがあります。'
+    );
+    return;
+  }
+
+  // 中身が読めた時点で、まず取り込みの導線を出す。
+  // カードの絵は 500KB の索引を待つので、それより先に押せるようにしておく。
+  renderHead(deck);
+  renderCta(code);
+
+  try {
+    index = await loadIndex('/cards-min.json');
+    if (deck.cards.some((c) => !index[c.cardId])) {
+      Object.assign(index, await loadIndex('/cards-min-extra.json'));
+    }
+  } catch (e) {
+    // 索引が読めなくても、取り込み自体はアプリ側で完結する。
+    // 絵が出ないだけなので、ページは畳まない。
+    $('warn').textContent = 'カードの絵を読み込めませんでした。アプリでは正しく取り込めます。';
+    $('warn').classList.remove('hidden');
+    return;
+  }
+  renderCards(deck);
+}
+
+function renderHead(deck) {
+  const color = ENERGY_COLORS[deck.energyName] || ENERGY_COLORS.common;
+  document.documentElement.style.setProperty('--deck', color);
+  const total = deck.cards.reduce((sum, c) => sum + c.count, 0);
+  const name = deck.name.trim() || '名前のないデッキ';
+  $('title').textContent = name;
+  document.title = `${name} ― PokeDeck で共有されたデッキ`;
+  $('count').textContent = `${total} 枚 ・ ${deck.cards.length} 種類`;
+  $('meta').classList.remove('hidden');
+}
+
+function renderCta(code) {
+  $('cta').classList.remove('hidden');
+  $('note').classList.remove('hidden');
+
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  $('open').addEventListener('click', () => {
+    if (isAndroid) {
+      // Chrome の intent:// なら、アプリが無いときの行き先まで一緒に渡せる。
+      // 自前で時間を測って振り分けるより確実。
+      location.href =
+        `intent://d?c=${code}#Intent;scheme=pokedeck;package=${PACKAGE};` +
+        `S.browser_fallback_url=${encodeURIComponent(PLAY_URL)};end`;
+      return;
+    }
+    // それ以外は素のスキームで呼んで、何も起きなければストアへ送る。
+    // アプリが開いていれば、この頁は隠れるので下のタイマーは動かない。
+    const timer = setTimeout(() => {
+      if (!document.hidden) location.href = PLAY_URL;
+    }, 1500);
+    window.addEventListener('pagehide', () => clearTimeout(timer), { once: true });
+    location.href = `pokedeck://d?c=${code}`;
+  });
+}
+
+function renderCards(deck) {
+  const missing = deck.cards.filter((c) => !index[c.cardId]);
+  if (missing.length > 0) {
+    const count = missing.reduce((sum, c) => sum + c.count, 0);
+    $('warn').textContent = `${count} 枚は、このページのカード一覧に見つかりませんでした。`;
+    $('warn').classList.remove('hidden');
+  }
+
+  const groups = new Map();
+  for (const entry of deck.cards) {
+    const found = index[entry.cardId];
+    const card = {
+      count: entry.count,
+      name: found ? found[0] : `カード ${entry.cardId}`,
+      image: found ? found[1] : null,
+      type: found ? found[2] : '',
+    };
+    const group = classify(card.type);
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(card);
+  }
+
+  const out = document.createDocumentFragment();
+  for (const name of SECTIONS) {
+    const cards = groups.get(name);
+    if (!cards) continue;
+    if (name === 'トレーナーズ') {
+      cards.sort((a, b) => order(a.type) - order(b.type));
+    }
+    out.appendChild(section(name, cards));
+  }
+  $('sections').appendChild(out);
+}
+
+function order(type) {
+  const at = TRAINER_ORDER.indexOf(type);
+  return at < 0 ? Number.MAX_SAFE_INTEGER : at;
+}
+
+function section(name, cards) {
+  const el = document.createElement('section');
+  const head = document.createElement('div');
+  head.className = 'sec-head';
+  head.innerHTML = `<span></span><span class="n"></span>`;
+  head.children[0].textContent = name;
+  head.children[1].textContent = cards.reduce((sum, c) => sum + c.count, 0);
+  el.appendChild(head);
+
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  for (const card of cards) {
+    const cell = document.createElement('div');
+    cell.className = 'card';
+    if (card.image) {
+      const img = document.createElement('img');
+      img.src = IMAGE_BASE + card.image;
+      img.alt = card.name;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      cell.appendChild(img);
+    } else {
+      const blank = document.createElement('div');
+      blank.className = 'blank';
+      blank.textContent = card.name;
+      cell.appendChild(blank);
+    }
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = card.count;
+    cell.appendChild(n);
+    grid.appendChild(cell);
+  }
+  el.appendChild(grid);
+  return el;
+}
+
+main();
+</script>
+</body>
+</html>

@@ -26,3 +26,19 @@
 /events.json
   Cache-Control: public, max-age=0, must-revalidate
   Access-Control-Allow-Origin: *
+
+# デッキ共有ページがカード名と絵を引く索引。
+# 中身はカードデータと一緒にしか変わらないので version.json に揃える。
+/cards-min.json
+  Cache-Control: public, max-age=300, must-revalidate
+  Access-Control-Allow-Origin: *
+
+/cards-min-extra.json
+  Cache-Control: public, max-age=300, must-revalidate
+  Access-Control-Allow-Origin: *
+
+# Android の App Links の検証で読まれる。
+# 検証は端末側で気まぐれに走るので、長く持たせない。
+/.well-known/assetlinks.json
+  Cache-Control: public, max-age=300, must-revalidate
+  Content-Type: application/json

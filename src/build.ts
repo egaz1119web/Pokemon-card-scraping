@@ -141,6 +141,30 @@ function compose(
   return out;
 }
 
+/** カード画像の URL に必ず付く頭。索引では落として、読む側で付け直す。 */
+const IMAGE_PREFIX = "/assets/images/card_images/large/";
+
+/**
+ * デッキ共有ページ用の索引。`{ "48466": ["名前", "M1S/048466_….jpg", "ポケモン"] }`。
+ *
+ * cardId は**ゼロ詰めを外した数字**にする。共有コードが数値で持っているため。
+ * 画像は [IMAGE_PREFIX] を落とす（8,000 件ぶんで 250KB 以上効く）。
+ * これで 5MB が 500KB、配信時の gzip 後で 130KB ほどになる。
+ */
+function serializeCardIndex(cards: CardRecord[]): string {
+  const index: Record<string, [string, string, string]> = {};
+  for (const card of cards) {
+    const id = String(Number(card.cardId));
+    const image = String(card.imageUrl ?? "");
+    index[id] = [
+      String(card.nameJp ?? ""),
+      image.startsWith(IMAGE_PREFIX) ? image.slice(IMAGE_PREFIX.length) : image,
+      String(card.type ?? ""),
+    ];
+  }
+  return JSON.stringify(index);
+}
+
 function serialize(rows: CardRecord[]): string {
   return JSON.stringify(rows.map(normalizeKeyOrder));
 }
@@ -364,6 +388,13 @@ async function main(): Promise<void> {
   if (orderedExtra.length > 0 || existsSync(MASTER_EXTRA)) {
     writeLineDelimitedArray(MASTER_EXTRA, orderedExtra);
     writeFileSync(`${OUT_DIR}/cards-extra.json`, serialize(orderedExtra));
+  }
+  // デッキ共有ページ（public/d/）が名前と絵を引くための索引。
+  // 5MB の cards.json をブラウザに読ませるわけにはいかないので、
+  // 必要な 3 項目だけに削ったものを別に出す。
+  writeFileSync(`${OUT_DIR}/cards-min.json`, serializeCardIndex(ordered));
+  if (orderedExtra.length > 0 || existsSync(MASTER_EXTRA)) {
+    writeFileSync(`${OUT_DIR}/cards-min-extra.json`, serializeCardIndex(orderedExtra));
   }
   // 旧 Supabase が返していた形（[{"id":1,"version":N}]）に合わせる。
   // iOS 側の Version 型は id を必須にしているため、省くとデコードに失敗する。

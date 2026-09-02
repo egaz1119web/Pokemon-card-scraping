@@ -128,6 +128,8 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 - `public/version.json` … `[{"id":1,"version":54,"extraVersion":0}]`
 - `public/cards.json` … スタンダードの積み上げ全件の配列
 - `public/cards-extra.json` … エクストラにしか無いカードの配列
+- `public/cards-min.json` … デッキ共有ページ用の索引（下記）
+- `public/cards-min-extra.json` … 同上のエクストラぶん
 
 いずれも旧 Supabase（PostgREST）と同じ配列形式にしてあるので、
 アプリ側の `VersionResponse` / `CardDetailResponse` は変更不要。
@@ -135,12 +137,48 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 `data/cards.json` は 1 レコード 1 行で書き出している。
 どのカードが増えたか・変わったかが `git diff` でそのまま読める。
 
+## デッキ共有ページ（`public/d/`）
+
+アプリで共有したデッキのリンク（`/d?c=…`）を開くページ。
+アプリを入れていない人にもデッキの中身が見え、そこからインストールへ送る。
+
+**デッキはどこにも保存していない。**カードの ID と枚数を詰めて URL 自体に
+載せてある。60 枚のデッキで URL 180 字ほど、QR にも収まる。
+保存先が要らず期限も無い代わりに、**一度配ったリンクは取り消せない**。
+
+| ファイル | 役目 |
+|---|---|
+| `public/d/index.html` | ページ本体 |
+| `public/d/share-code.js` | 共有コードを開く。アプリ側 `DeckShareCode.kt` と同じ並びを扱う |
+| `public/cards-min.json` | カード ID → 名前・画像・種別。5MB の `cards.json` は重すぎるので削ったもの |
+| `public/.well-known/assetlinks.json` | Android の App Links の検証用 |
+
+### 形を変えるときの約束
+
+`share-code.js` と アプリの `DeckShareCode.kt` は**同じ並びを読み書きしている**。
+片方だけ直すと、配ったリンクがもう一方で読めなくなる。
+両方に同じ文字列を使った試験を置いてあるので、`npm test` と
+アプリの `DeckShareCodeTest` が**両方通ること**を必ず確かめる。
+詰め方を変えるなら版（`VERSION`）を上げて、古い版も読めるようにすること。
+
+### assetlinks.json
+
+いまは**開発機のデバッグ署名**しか書いていない。
+Play が配るアプリは Play App Signing の鍵で署名し直されるので、
+**Play Console →「テストとリリース」→「アプリの署名」の SHA-256** を
+`sha256_cert_fingerprints` に足さないと、実際の利用者の端末では検証が通らない。
+
+検証が通らなくてもリンクは死なない。ブラウザでこのページが開き、
+「アプリで開く」が `pokedeck://` でアプリを呼ぶ。検証が通ると、
+ブラウザを挟まずアプリへ直行するようになる。
+
 ## コマンド
 
 ```bash
 npm ci
 npm run build      # 差分更新（新規カードのみ詳細を取得）
 npm run validate   # 旧データと突き合わせて移植の正しさを確認
+npm run test       # デッキ共有コードの読み取り
 npm run typecheck
 ```
 
