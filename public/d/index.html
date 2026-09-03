@@ -178,6 +178,7 @@ const ENERGY_COLORS = {
 
 // アプリのデッキ詳細と同じ並び・同じ分け方。
 const SECTIONS = ['ポケモン', 'トレーナーズ', 'エネルギー', 'その他'];
+// どの区分に入れるかの判定にだけ使う。並べ替えには使わない（送り手の順を保つため）。
 const TRAINER_ORDER = ['グッズ', 'どうぐ', 'サポート', 'スタジアム'];
 function classify(type) {
   if (type === 'ポケモン') return 'ポケモン';
@@ -298,11 +299,28 @@ function renderCta(code) {
         return;
       }
       // iOS には intent:// が無いので、呼んでみて何も起きなければ店へ送る。
-      // アプリが開けばこの頁は隠れるので、下のタイマーは動かない。
-      const timer = setTimeout(() => {
-        if (!document.hidden) location.href = APP_STORE_URL;
-      }, 1500);
-      window.addEventListener('pagehide', () => clearTimeout(timer), { once: true });
+      //
+      // **鳴った時刻を必ず見ること。**
+      // アプリが開くと Safari は裏へ回り、この頁はタイマーごと凍らされる。
+      // 凍っている間は時間が進まないので、Safari に戻ってきた瞬間に遅れて鳴る。
+      // そのときはもう画面が表に戻っていて document.hidden も false なので、
+      // 「鳴った＝アプリが無かった」と決めつけると、アプリを開いた人を
+      // その直後に店へ飛ばしてしまう。予定より遅れて鳴ったなら、
+      // その間ここは止まっていた＝アプリが前に出ていた、ということ。
+      const WAIT = 1500;
+      const SLACK = 400;
+      const startedAt = Date.now();
+      let leftPage = false;
+      const markLeft = () => { leftPage = true; };
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) markLeft();
+      });
+      window.addEventListener('pagehide', markLeft, { once: true });
+      setTimeout(() => {
+        if (leftPage || document.hidden) return;
+        if (Date.now() - startedAt > WAIT + SLACK) return;
+        location.href = APP_STORE_URL;
+      }, WAIT);
       location.href = `${APP_SCHEME}://d?c=${code}`;
     });
   }
@@ -335,21 +353,17 @@ function renderCards(deck) {
     groups.get(group).push(card);
   }
 
+  // **並べ替えないこと。**
+  // v2 のコードには送り手のアプリに並んでいた順がそのまま入っている。
+  // 区分に振り分けても順番は崩れない（振り分けは前から順に足しているだけ）ので、
+  // ここで手を入れなければ、送り手のアプリと同じ並びで出る。
   const out = document.createDocumentFragment();
   for (const name of SECTIONS) {
     const cards = groups.get(name);
     if (!cards) continue;
-    if (name === 'トレーナーズ') {
-      cards.sort((a, b) => order(a.type) - order(b.type));
-    }
     out.appendChild(section(name, cards));
   }
   $('sections').appendChild(out);
-}
-
-function order(type) {
-  const at = TRAINER_ORDER.indexOf(type);
-  return at < 0 ? Number.MAX_SAFE_INTEGER : at;
 }
 
 function section(name, cards) {
