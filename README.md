@@ -149,17 +149,39 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 | ファイル | 役目 |
 |---|---|
 | `public/d/index.html` | ページ本体 |
-| `public/d/share-code.js` | 共有コードを開く。アプリ側 `DeckShareCode.kt` と同じ並びを扱う |
+| `public/d/share-code.js` | 共有コードを開く。アプリ側 `DeckShareCode.kt` / `.swift` と同じ並びを扱う |
 | `public/cards-min.json` | カード ID → 名前・画像・種別。5MB の `cards.json` は重すぎるので削ったもの |
 | `public/.well-known/assetlinks.json` | Android の App Links の検証用 |
 
+### カードの並び
+
+**共有コードには、送り手のアプリに並んでいた順がそのまま入っている。**
+このページも受け取ったアプリも**並べ替えずに**出す。だから送った人の画面と
+相手の画面と、このページの 3 つで並びが揃う。
+
+並びはユーザーがデッキ画面でドラッグして変えられるもので、カードの中身からは
+復元できない。だから送るしかない。区分（ポケモン / トレーナーズ / エネルギー）に
+振り分けてはいるが、`groupBy` も `Dictionary(grouping:)` も元の順を保つので崩れない。
+
+`index.html` でも `DeckImportScreen.kt` でも `DeckImportView.swift` でも、
+**ここに `sort` を足さないこと。**足すと送り手の画面とずれる。
+
 ### 形を変えるときの約束
 
-`share-code.js` と アプリの `DeckShareCode.kt` は**同じ並びを読み書きしている**。
-片方だけ直すと、配ったリンクがもう一方で読めなくなる。
-両方に同じ文字列を使った試験を置いてあるので、`npm test` と
-アプリの `DeckShareCodeTest` が**両方通ること**を必ず確かめる。
-詰め方を変えるなら版（`VERSION`）を上げて、古い版も読めるようにすること。
+`share-code.js` と アプリの `DeckShareCode.kt` / `DeckShareCode.swift` は
+**同じ並びを読み書きしている**。片方だけ直すと、配ったリンクが他方で読めなくなる。
+3 つとも同じ文字列を使った試験を持っているので、`npm test` と
+`DeckShareCodeTest`（Android）と `DeckShareCodeTests`（iOS）が
+**全部通ること**を必ず確かめる。
+詰め方を変えるなら版（`VERSION`）を上げること。
+
+| 版 | 中身 |
+|---|---|
+| 1 | カード ID を昇順に並べ替え、差分を素の varint で持っていた |
+| 2 | 並べ替えをやめ、送り手の並びのまま。差が負にも振れるのでジグザグ詰め |
+
+版が違うコードは**読まずに捨てる**。読み方が違うので、通してしまうと
+検査値が偶然合ったときに中身が化ける。
 
 ### assetlinks.json
 

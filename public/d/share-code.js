@@ -4,7 +4,9 @@
 // 片方だけ直すと共有リンクが読めなくなるので、必ず両方を揃えること。
 // 並びの説明は Kotlin 側の説明を参照。
 
-export const VERSION = 1;
+// v2 でカードの並びを送り手のアプリの表示順そのままに変えた。
+// v1 は cardId 昇順に並べ替えていたので、読み方が違う。混ぜられないので受け付けない。
+export const VERSION = 2;
 
 // 添字をそのまま書き出しているので並べ替えてはいけない。
 export const ENERGY_NAMES = [
@@ -71,6 +73,11 @@ class Cursor {
   }
 }
 
+/** ジグザグ詰めを解く。0,1,2,3,4… を 0,-1,1,-2,2… と読む。 */
+function unzigzag(value) {
+  return (value >>> 1) ^ -(value & 1);
+}
+
 /**
  * 共有コードを開く。
  * 戻り値は `{ name, cards: [{cardId, count}], energyName, mainCardId, subCardId }`。
@@ -98,8 +105,10 @@ export function decode(code) {
     const cards = [];
     let previous = 0;
     for (let i = 0; i < size; i++) {
-      const cardId = previous + cursor.varint();
+      // 並べ替えていないので差は前にも後ろにも動く。負を跨げる詰め方（ジグザグ）で読む。
+      const cardId = previous + unzigzag(cursor.varint());
       const count = cursor.varint();
+      if (cardId <= 0) return null;
       cards.push({ cardId, count });
       previous = cardId;
     }

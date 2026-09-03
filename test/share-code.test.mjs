@@ -4,43 +4,48 @@
 // 下の goldens はアプリ側で実際に作らせたコードをそのまま貼ったもの。
 // Kotlin 側にも同じ文字列を置いた試験がある（DeckShareCodeTest）。
 // **どちらか片方だけ通る状態は、共有リンクが読めなくなっているということ。**
-// 形を変えるなら版（VERSION）を上げて、古い版も読めるようにすること。
+// 形を変えるなら版（VERSION）を上げること。
+//
+// v2 から、カードは**送り手のアプリに並んでいた順のまま**入っている。
+// 下の goldens も昇順ではない並びをわざと選んでいる。並べ替えて比べないこと。
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decode, extractCode, ENERGY_NAMES } from '../public/d/share-code.js';
+import { decode, extractCode, ENERGY_NAMES, VERSION } from '../public/d/share-code.js';
 
 const goldens = [
   {
     label: '60 枚・20 種類のデッキ',
-    code: 'AQUACBTjg6Hjgqzjgqzjg6vjg7zjg6lleBSH0AIEAQNoAvEGAQEEYgQBAoMHAwEEAQHmBwIBBOcHAwEB5wcEAQLnBwQBA-cHAYUECKsM',
+    code: 'AgUACBTjg6Hjgqzjgqzjg6vjg7zjg6lleBSOoAUE0gECzwEDtA8EAQHGAQQCAoYOAwIEAgHODwQBAtAPAwIBzg8EAgLODwQCA84PAYoICLmg',
     expect: {
       name: 'メガガルーラex',
       energyName: 'fight',
       mainCardId: 43015,
       subCardId: 45001,
+      // 昇順ではない。アプリで並べ替えたデッキのつもり。
       cards: [
-        [43015, 4], [43016, 3], [43120, 2], [44001, 1], [44002, 4],
+        [43015, 4], [43120, 2], [43016, 3], [44002, 4], [44001, 1],
         [44100, 4], [44101, 2], [45000, 3], [45001, 4], [45002, 1],
-        [46000, 2], [46001, 4], [47000, 3], [47001, 1], [48000, 4],
+        [46001, 4], [46000, 2], [47000, 3], [47001, 1], [48000, 4],
         [48001, 2], [49000, 4], [49001, 3], [50000, 1], [50517, 8],
       ],
     },
   },
   {
     label: 'カードが 1 枚も入っていないデッキ',
-    code: 'Af___wPnqboAUCo',
+    code: 'Av___wPnqboAUTM',
     expect: { name: '空', energyName: null, mainCardId: null, subCardId: null, cards: [] },
   },
   {
     label: '絵文字と記号を含むデッキ名',
-    code: 'AQEB_xnwn5Sl54KO44OH44OD44KtIHYyICjmlLkpAmQBZDtE0w',
+    code: 'AgEA_xnwn5Sl54KO44OH44OD44KtIHYyICjmlLkpApADO8cBAdd1',
     expect: {
       name: '🔥炎デッキ v2 (改)',
       energyName: 'fire',
       mainCardId: 200,
       subCardId: null,
-      cards: [[100, 1], [200, 59]],
+      // 後ろのカードほど番号が小さい。差が負に振れる場合。
+      cards: [[200, 59], [100, 1]],
     },
   },
 ];
@@ -96,6 +101,18 @@ test('文中や貼り付けからコードを取り出す', () => {
   assert.equal(extractCode(code), code);
   assert.equal(extractCode('ただの文'), null);
   assert.equal(extractCode(''), null);
+});
+
+test('版が上がったら goldens も作り直す', () => {
+  assert.equal(VERSION, 2);
+});
+
+test('cardId 昇順に並べ替えていた v1 のコードは読まない', () => {
+  // 同じデッキを v1 で詰めたもの。読み方が違うので、読めてしまうと中身が化ける。
+  assert.equal(
+    decode('AQUACBTjg6Hjgqzjgqzjg6vjg7zjg6lleBSH0AIEAQNoAvEGAQEEYgQBAoMHAwEEAQHmBwIBBOcHAwEB5wcEAQLnBwQBA-cHAYUECKsM'),
+    null,
+  );
 });
 
 test('エネルギーの綴りの並びは固定', () => {
