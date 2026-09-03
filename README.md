@@ -166,6 +166,11 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 `index.html` でも `DeckImportScreen.kt` でも `DeckImportView.swift` でも、
 **ここに `sort` を足さないこと。**足すと送り手の画面とずれる。
 
+区分そのものの順（ポケモン → グッズ → … → 基本エネルギー → 特殊エネルギー）は
+アプリ側で決まる。Android の `util/DeckOrder.kt` と iOS の `Data/DeckOrder.swift` に
+**同じ並び**を置いてあり、両方に同じ並びを固定した試験がある。片方だけ直すと、
+同じデッキでも作った OS によって相手の見る順番が変わる。
+
 ### 形を変えるときの約束
 
 `share-code.js` と アプリの `DeckShareCode.kt` / `DeckShareCode.swift` は
