@@ -203,6 +203,66 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 **`og:image` は絶対 URL で書くこと。**相対で書くとクローラが辿れず、貼っても
 絵の出ないリンクになる（移す前はそうなっていた）。
 
+## 計測
+
+共有 URL が配り方の中心なので、見たいのは「何人が使ったか」ではなく
+**1 本の共有がどこで途切れるか**。段ごとに数える場所を分けてある。
+
+```
+アプリ  共有を作った      deck_share_created
+アプリ    → 送った        deck_share_sent      （送る／コピー）
+Web       → 開かれた      /d/ の閲覧数（Cloudflare Web Analytics）
+ストア      → 入れた      Play Console のユーザー獲得（utm_source）
+アプリ        → 戻った    deck_share_opened
+アプリ          → 入った  deck_share_imported
+```
+
+途中の 1 段だけが極端に細ければ、そこが直す場所になる。
+何本目で折れているか分からないまま画面をいじるのがいちばん高くつく。
+
+比べる相手として `deck_copied`（`from` = `event` / `remote` / `code`）も取る。
+共有以外の道で増えたデッキの数が分からないと、共有の数字が多いのか少ないのか
+判断できない。
+
+### アプリの中（Firebase Analytics）
+
+`PokemonCardTools/app/.../util/Metrics.kt` と `なかよしポケカ/Metrics.swift`。
+**名前も引数も両 OS でそろえてある。片方だけ変えないこと。**
+Firebase では別の出来事として並び、合計が取れなくなる。
+
+デッキの中身・名前・カード ID は送らない。数と種別だけ。
+誰が何を組んだかはこちらが知る必要のない話で、知ると預かる責任だけが増える。
+
+### Web（Cloudflare Web Analytics）
+
+`public/index.html` と `public/d/index.html` の `</head>` の直前。
+無料・無制限で、Cookie を置かず個人を追わない。
+
+**トークンを入れるまで何も読み込まない。**素で貼ると、届け先が無いのに
+訪問者のブラウザから毎回リクエストが飛ぶ。発行は Cloudflare の管理画面
+（Web Analytics → サイトを追加 → ホスト名 `pokedeck.op-sarada.workers.dev`）。
+
+```bash
+sed -i '' 's/__CF_BEACON_TOKEN__/<発行されたトークン>/' public/index.html public/d/index.html
+```
+
+X や LINE の見出し取得（OGP のクローラ）は JavaScript を動かさないので
+ここには数えられない。つまりこの数字は、実際に人が開いた回数に近い。
+
+### ストアへの入口
+
+Play へのリンクには `referrer=utm_source%3D…` を付けてある
+（共有ページ = `share`、紹介ページ = `lp`）。Play Console の
+「ユーザー獲得」で出所ごとに分かれる。
+
+**HTML の属性では `&amp;` と書くこと。**素の `&` だと `&referrer` が
+`&reg`（®）として解釈されうる。HTML5 はセミコロン無しの `&reg` を認めている。
+
+App Store 側で同じことをするには Provider ID が要る（`?pt=…&ct=share`）。
+今は付けていないので、iOS は共有ページ経由と紹介ページ経由を区別できない。
+App Store Connect の「ソース」で web の参照元は見えるが、どちらも同じ
+ホスト名なので同じ行にまとまる。
+
 ## デッキ共有ページ（`public/d/`）
 
 アプリで共有したデッキのリンク（`/d?c=…`）を開くページ。

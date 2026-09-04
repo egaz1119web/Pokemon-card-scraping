@@ -142,6 +142,29 @@
   .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
   @media (prefers-reduced-motion: reduce) { .zoom { animation: none; } }
 </style>
+<!--
+  Cloudflare Web Analytics。無料・無制限で、Cookie を置かず個人を追わない。
+  数えるのは「このページが何回開かれたか」と「どこから来たか」だけ。
+
+  X や LINE の見出し取得（OGP のクローラ）は JavaScript を動かさないので
+  ここには数えられない。つまりこの数字は、実際に人が開いた回数に近い。
+
+  **トークンを入れるまでは何も読み込まない。** 素で貼ると、まだ届け先が
+  無いのに訪問者のブラウザから毎回リクエストが飛ぶので、入れてから動かす。
+  発行は Cloudflare の管理画面（Web Analytics → サイトを追加 →
+  ホスト名 pokedeck.op-sarada.workers.dev）。取れたら下の 1 か所を置き換える。
+-->
+<script>
+  (function () {
+    var token = '__CF_BEACON_TOKEN__';
+    if (token.charAt(0) === '_') return;
+    var s = document.createElement('script');
+    s.defer = true;
+    s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    s.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
+    document.head.appendChild(s);
+  })();
+</script>
 </head>
 <body>
 <div class="glow" id="glow"></div>
@@ -158,7 +181,7 @@
 
   <div class="cta hidden" id="cta">
     <button class="btn primary hidden" id="open">アプリで開く<small>そのまま自分のデッキになります</small></button>
-    <a class="btn hidden" id="play" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">Google Play<small>Android 版 PokeDeck</small></a>
+    <a class="btn hidden" id="play" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools&amp;referrer=utm_source%3Dshare%26utm_medium%3Dweb" target="_blank" rel="noopener">Google Play<small>Android 版 PokeDeck</small></a>
     <a class="btn hidden" id="appstore" href="https://apps.apple.com/app/id6747426098" target="_blank" rel="noopener">App Store<small>iPhone 版 PokeDeck</small></a>
   </div>
   <p class="note hidden" id="note"></p>
@@ -180,7 +203,10 @@ import { decode } from './share-code.js';
 // アプリが無いときの行き先。ストアへの入口は HTML 側の <a> が持っていて、
 // ここは intent:// に渡すぶんだけ。App Store の方は国を指定しない形にしてある
 // （開いた人の地域のストアへ Apple 側が振り分ける）。
-const PLAY_URL = 'https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools';
+// ストアへの入口には出所を付けておく（Play Console の「ユーザー獲得」で分かれる）。
+// 共有リンク経由の設置と、紹介ページ経由の設置を混ぜないため。
+// App Store 側は同じことをするのに Provider ID が要るので、今は素のままにしてある。
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools&referrer=utm_source%3Dshare%26utm_medium%3Dweb';
 const APP_STORE_URL = 'https://apps.apple.com/app/id6747426098';
 const PACKAGE = 'jp.egaz.pokemoncardtools';
 /// アプリを直に呼ぶときの合図。Android / iOS の両方で同じ綴り。

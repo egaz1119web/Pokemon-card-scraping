@@ -230,6 +230,29 @@
     color: var(--text2); font-size: 13px;
   }
 </style>
+<!--
+  Cloudflare Web Analytics。無料・無制限で、Cookie を置かず個人を追わない。
+  数えるのは「このページが何回開かれたか」と「どこから来たか」だけ。
+
+  X や LINE の見出し取得（OGP のクローラ）は JavaScript を動かさないので
+  ここには数えられない。つまりこの数字は、実際に人が開いた回数に近い。
+
+  **トークンを入れるまでは何も読み込まない。** 素で貼ると、まだ届け先が
+  無いのに訪問者のブラウザから毎回リクエストが飛ぶので、入れてから動かす。
+  発行は Cloudflare の管理画面（Web Analytics → サイトを追加 →
+  ホスト名 pokedeck.op-sarada.workers.dev）。取れたら下の 1 か所を置き換える。
+-->
+<script>
+  (function () {
+    var token = '__CF_BEACON_TOKEN__';
+    if (token.charAt(0) === '_') return;
+    var s = document.createElement('script');
+    s.defer = true;
+    s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    s.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
+    document.head.appendChild(s);
+  })();
+</script>
 </head>
 <body>
 
@@ -266,7 +289,7 @@
       <p class="lead">デッキ作りも、ひらがな検索も、1つのアプリで。
 8,000枚以上のカードから探して、組んで、画像で残せます。</p>
       <div class="cta-row">
-        <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">
+        <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools&amp;referrer=utm_source%3Dlp%26utm_medium%3Dweb" target="_blank" rel="noopener">
           <svg class="store-icon" aria-hidden="true"><use href="#logo-play"/></svg>
           <span>Google Play<small>Android 版</small></span>
         </a>
@@ -413,7 +436,7 @@ SNSでの共有に。</p>
         <span class="badge live">公開中</span>
         <h3><svg class="store-icon" aria-hidden="true"><use href="#logo-play"/></svg>Android</h3>
         <p>Google Play で「PokeDeck」として公開しています。無料です。</p>
-        <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">Google Play で入手</a>
+        <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools&amp;referrer=utm_source%3Dlp%26utm_medium%3Dweb" target="_blank" rel="noopener">Google Play で入手</a>
       </div>
       <div class="platform-card">
         <span class="badge live">公開中</span>
