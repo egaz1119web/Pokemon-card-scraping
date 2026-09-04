@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>プライバシーポリシー ― PokeDeck</title>
+<meta name="description" content="ポケモンカードのデッキ管理アプリ「PokeDeck」（Android / iOS）のプライバシーポリシー。集める情報、使う目的、削除の方法。">
+<meta property="og:title" content="プライバシーポリシー ― PokeDeck">
+<meta property="og:description" content="PokeDeck が集める情報、使う目的、そして自分で消す方法。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://pokedeck.op-sarada.workers.dev/privacy">
+<meta property="og:image" content="https://pokedeck.op-sarada.workers.dev/assets/icons/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* 色と字は紹介ページ（index.html）と同じ。
+     アプリの設定から開く先なので、別のサイトに見えては困る。 */
+  :root {
+    --bg: #0F0E15;
+    --surface: #1F1E2A;
+    --surface2: #171622;
+    --text: #F2F0F7;
+    --text2: #A9A5B8;
+    --text3: #7C7790;
+    --accent: #C9B6FF;
+    --accent-strong: #A98BFF;
+    --line: rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.9;
+  }
+  a { color: var(--accent); }
+  .glow {
+    position: fixed;
+    top: -220px; left: 50%; transform: translateX(-50%);
+    width: 760px; height: 520px;
+    background: radial-gradient(closest-side, rgba(169,139,255,.16), transparent);
+    pointer-events: none;
+  }
+  .wrap {
+    position: relative;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  .eyebrow {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .18em;
+    color: var(--accent);
+  }
+  .eyebrow a { text-decoration: none; }
+  h1 {
+    font-size: clamp(26px, 5vw, 34px);
+    font-weight: 900;
+    margin: 10px 0 6px;
+    text-wrap: balance;
+  }
+  .updated { color: var(--text3); font-size: 13px; margin: 0 0 28px; }
+  h2 {
+    font-size: 18px;
+    font-weight: 900;
+    margin: 40px 0 10px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  h3 { font-size: 15px; font-weight: 700; color: var(--accent); margin: 22px 0 6px; }
+  p { margin: 0 0 12px; color: var(--text2); font-size: 15px; }
+  ul { margin: 0 0 14px; padding-left: 1.3em; color: var(--text2); font-size: 15px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--text); font-weight: 700; }
+  .panel {
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin: 0 0 16px;
+  }
+  .panel p:last-child, .panel ul:last-child { margin-bottom: 0; }
+  .lead { color: var(--text); font-size: 16px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .88em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: var(--text);
+  }
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--text3);
+    font-size: 13px;
+  }
+</style>
+<!--
+  Cloudflare Web Analytics。無料・無制限で、Cookie を置かず個人を追わない。
+  数えるのは「このページが何回開かれたか」と「どこから来たか」だけ。
+  この頁の内容そのものが、その扱いを説明している。
+
+  読み込みはトークンが入っているときだけ走る。`__CF_BEACON_TOKEN__` のような
+  未設定の値のままだと何も読み込まない——素で貼ると、届け先が無いのに
+  訪問者のブラウザから毎回リクエストが飛ぶため。
+-->
+<script>
+  (function () {
+    var token = '794e8304fd9740688ee6a38cf6d23a87';
+    if (token.charAt(0) === '_') return;
+    var s = document.createElement('script');
+    // Cloudflare が配っている書き方に合わせる。module は既定で遅延読み込み。
+    s.type = 'module';
+    s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    s.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
+    document.head.appendChild(s);
+  })();
+</script>
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+
+  <div class="eyebrow"><a href="/">PokeDeck</a></div>
+  <h1>プライバシーポリシー</h1>
+  <p class="updated">制定日 2025年1月18日 ／ 最終更新日 2026年9月5日</p>
+
+  <p class="lead">
+    このページは、ポケモンカードのデッキ管理アプリ <strong>PokeDeck</strong>（Android 版・iPhone 版）と、
+    このウェブサイトでの情報の扱いについて説明するものです。両方に同じ内容が当てはまります。
+  </p>
+
+  <div class="panel">
+    <p><strong>先に、いちばん大事なところだけ。</strong></p>
+    <ul>
+      <li>ログインしなくても、ほとんどの機能はそのまま使えます。</li>
+      <li>ログインした場合だけ、マイデッキなどをクラウドに預かります。</li>
+      <li>預けたものは、アプリの「設定 → アカウントを削除」で<strong>いつでもご自身で消せます</strong>。</li>
+      <li>デッキの名前や中身を、利用状況の記録として送ることはありません。</li>
+    </ul>
+  </div>
+
+  <h2>1. 集める情報</h2>
+
+  <h3>アカウントの情報（Google でログインしたときだけ）</h3>
+  <p>
+    メールアドレス、表示名、プロフィール画像、アカウントを見分けるための ID を、
+    Google から受け取って保持します。ログインしなければ、これらは一切受け取りません。
+  </p>
+
+  <h3>クラウドに預かるデータ（Google でログインしたときだけ）</h3>
+  <p>
+    マイデッキ、対戦記録、大会の予定を、上記のアカウント ID と結びつけて保存します。
+    別の端末で同じ内容を使えるようにするため、および機種変更のときに引き継げるようにするためです。
+  </p>
+
+  <h3>利用状況（Firebase Analytics）</h3>
+  <p>アプリがどこで使われ、どこで止まっているかを知るために、次のものを記録します。</p>
+  <ul>
+    <li>画面の遷移と、共有・取り込みなど<strong>操作の種類と回数</strong></li>
+    <li>端末の種類、OS の版、言語、地域</li>
+    <li>アプリのインストールごとに割り当てられる識別子</li>
+    <li>IP アドレスから推定される<strong>おおまかな地域</strong>（市区町村より粗い単位）</li>
+  </ul>
+  <p>
+    <strong>デッキの名前・中身・カードの種類は、ここには含めていません。</strong>
+    記録しているのは「共有を作った」「取り込んだ」といった操作の種類と、その枚数などの数だけです。
+    誰がどんなデッキを組んだかは、こちらが知る必要のない情報だと考えています。
+  </p>
+
+  <h3>広告（Google AdMob）</h3>
+  <p>
+    アプリには広告が表示されます。広告の配信と効果測定のために、
+    Google およびその提携先が広告用の識別子などを利用することがあります。
+    これは他社のアプリやウェブサイトをまたいだ追跡に使われる場合があります。
+    iPhone では、この追跡を許可するかどうかを OS の設定でご自身で選べます。
+  </p>
+
+  <h3>通知（Firebase Cloud Messaging）</h3>
+  <p>
+    お知らせを届けるために、端末ごとの通知用トークンを保持します。
+    通知を許可しなければ使いません。
+  </p>
+
+  <h3>このウェブサイト</h3>
+  <p>
+    Cloudflare Web Analytics を使って、ページの閲覧数と参照元を数えています。
+    <strong>Cookie を置かず、個々の訪問者を追いません。</strong>
+    共有リンクのページも同じ扱いです。
+  </p>
+
+  <h2>2. 使う目的</h2>
+  <ul>
+    <li>アプリとサービスの提供・運営</li>
+    <li>クラウド同期（ログインした場合）</li>
+    <li>不具合の把握と、使われ方に基づく改善</li>
+    <li>広告の表示</li>
+    <li>お問い合わせへの対応</li>
+    <li>利用規約に反する行為の調査</li>
+  </ul>
+  <p>これ以外の目的には使いません。集めた情報を販売することもありません。</p>
+
+  <h2>3. 第三者への提供</h2>
+  <p>
+    次の場合を除いて、集めた情報を第三者に提供することはありません。
+  </p>
+  <ul>
+    <li>ご本人の同意があるとき</li>
+    <li>法令に基づくとき</li>
+    <li>人の生命・身体・財産を守るために必要なとき</li>
+  </ul>
+  <p>
+    なお、上記の機能を動かすために <strong>Google（Firebase・AdMob）</strong> と
+    <strong>Cloudflare</strong> のサービスを利用しており、それぞれの取り扱いは各社の
+    プライバシーポリシーに従います。
+  </p>
+
+  <h2>4. 共有リンクについて</h2>
+  <p>
+    デッキを共有すると <code>/d/?c=…</code> という形のリンクができます。
+    <strong>デッキの中身はリンクの文字列そのものに入っていて、こちらのサーバーには保存していません。</strong>
+    誰がどのデッキを共有したかの記録も残していません。
+  </p>
+  <p>
+    そのかわり、<strong>一度配ったリンクは取り消せません。</strong>
+    リンクを知っている人は誰でもその中身を見られます。共有する相手にはご注意ください。
+  </p>
+
+  <h2>5. 保存する期間と、消し方</h2>
+  <p>
+    クラウドに預かったデータは、アカウントが存在する間ずっと保持します。
+    <strong>アプリの「設定 → アカウントを削除」から、いつでもご自身で削除できます。</strong>
+    アカウントと、クラウド上のマイデッキ・対戦記録・予定がまとめて消えます。
+  </p>
+  <p>
+    アプリをすでに削除しているなどでこの操作ができない場合は、下のお問い合わせ先へご連絡ください。
+    こちらで削除します。
+  </p>
+  <p>
+    <strong>端末の中だけに保存されているデータ（クラウド同期していないデッキなど）は、この操作の対象外です。</strong>
+    アプリをアンインストールすると消えます。
+  </p>
+  <p>
+    利用状況の記録は、Firebase Analytics の設定に従って一定期間で自動的に消えます。
+    個人を特定できる形では保持していません。
+  </p>
+
+  <h2>6. 情報の管理</h2>
+  <p>
+    情報の漏えい・紛失・改ざんを防ぐため、適切な安全管理の措置をとります。
+    クラウドに預かったデータは、ログインしたご本人以外が読めない設定にしています。
+  </p>
+
+  <h2>7. 情報の開示・訂正・削除</h2>
+  <p>
+    ご自身の情報の開示・訂正・削除を求めることができます。
+    ご連絡をいただき次第、速やかに対応します。
+  </p>
+
+  <h2>8. お問い合わせ</h2>
+  <p>
+    このポリシーについてのお問い合わせは
+    <a href="https://forms.gle/KjpN6akKRnY2WzSz7" target="_blank" rel="noopener">お問い合わせフォーム</a>
+    または <a href="mailto:poke.nakayoshi.999@gmail.com">poke.nakayoshi.999@gmail.com</a> までお願いします。
+  </p>
+
+  <h2>9. このポリシーの変更</h2>
+  <p>
+    必要に応じて内容を変更することがあります。変更したときは、このページの最終更新日を改めます。
+    大きな変更のときは、アプリ上でもお知らせします。
+  </p>
+
+  <footer>
+    <p>
+      ポケットモンスター・ポケモン・Pokémon は任天堂・クリーチャーズ・ゲームフリークの登録商標です。
+      PokeDeck は個人が作ったファンアプリであり、株式会社ポケモンおよび関連企業とは一切関係ありません。
+    </p>
+    <p><a href="/">PokeDeck について</a></p>
+  </footer>
+
+</div>
+</body>
+</html>
