@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PokeDeck ― ポケモンカードのデッキ管理アプリ</title>
+<meta name="description" content="大会の入賞デッキをそのままコピー。ひらがな検索、その場でデッキ編集、画像で保存まで。ポケモンカードのデッキ管理アプリ「PokeDeck」。Android / iOS 対応。">
+<meta property="og:title" content="PokeDeck ― ポケモンカードのデッキ管理アプリ">
+<meta property="og:description" content="大会の入賞デッキをそのままコピー。デッキ作りも、ひらがな検索も、1つのアプリで。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pokedeck.op-sarada.workers.dev/">
+<!-- **og:image は絶対 URL でないといけない。** 相対で書くとクローラが辿れず、
+     X や LINE に貼っても絵の出ないリンクになる。 -->
+<meta property="og:image" content="https://pokedeck.op-sarada.workers.dev/assets/icons/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0F0E15;
+    --surface: #1F1E2A;
+    --surface2: #171622;
+    --text: #F2F0F7;
+    --text2: #A9A5B8;
+    --accent: #C9B6FF;
+    --accent-strong: #A98BFF;
+    --gold: #F2C14E;
+    --line: rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  .eyebrow {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Background glow, page-wide */
+  .glow-a, .glow-b {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(2px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .glow-a {
+    left: -220px; top: -260px; width: 640px; height: 640px;
+    background: radial-gradient(circle, rgba(169,139,255,0.22) 0%, rgba(169,139,255,0) 70%);
+  }
+  .glow-b {
+    right: -280px; top: 420px; width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(62,143,232,0.16) 0%, rgba(15,14,21,0) 70%);
+  }
+
+  /* Nav */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(15,14,21,0.72);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  nav.wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 68px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 18px; }
+  .brand img { width: 32px; height: 32px; border-radius: 9px; display: block; }
+  .nav-links { display: flex; align-items: center; gap: 28px; font-weight: 700; font-size: 14px; color: var(--text2); }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta {
+    padding: 9px 18px; border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent-strong), #7C5CFF);
+    color: #14121F; font-weight: 700; font-size: 14px;
+  }
+  @media (max-width: 640px) { .nav-links a:not(.nav-cta) { display: none; } }
+
+  /* Hero */
+  .hero {
+    position: relative; z-index: 1;
+    padding: 88px 0 40px;
+    display: grid; grid-template-columns: 1fr 380px; gap: 48px; align-items: center;
+  }
+  .hero h1 {
+    font-weight: 900; font-size: 52px; line-height: 1.25; margin: 18px 0 20px;
+    letter-spacing: 0.01em;
+  }
+  .hero h1 .nowrap { display: inline-block; }
+  .hero p.lead { font-weight: 700; font-size: 18px; line-height: 1.7; color: var(--text2); margin: 0 0 32px; white-space: pre-line; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .store-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 22px; border-radius: 16px;
+    background: var(--surface); border: 1px solid var(--line);
+    font-weight: 700; font-size: 15px;
+    transition: transform .15s ease, border-color .15s ease;
+  }
+  .store-btn:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+  /* デッキコード変換 */
+  [hidden] { display: none !important; }
+  .tool-lead {
+    max-width: 620px; margin: 18px auto 0;
+    color: var(--text2); font-size: 15px; line-height: 1.9; white-space: pre-line;
+  }
+  .tool-box {
+    max-width: 620px; margin: 0 auto; padding: 28px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .tool-field { display: flex; flex-direction: column; gap: 8px; }
+  .tool-field span { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--text2); }
+  .tool-field input {
+    width: 100%; padding: 13px 15px; border-radius: 12px;
+    background: var(--surface2); border: 1px solid var(--line);
+    color: var(--text); font: inherit; font-size: 15px;
+  }
+  .tool-field input::placeholder { color: var(--text2); opacity: 0.6; }
+  .tool-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .tool-btn { justify-content: center; width: 100%; cursor: pointer; font: inherit; font-weight: 700; }
+  .tool-btn[disabled] { opacity: 0.55; pointer-events: none; }
+  .tool-msg { margin: 0; font-size: 13px; line-height: 1.8; color: var(--gold); }
+  .tool-out {
+    display: flex; flex-direction: column; gap: 14px;
+    border-top: 1px solid var(--line); padding-top: 18px;
+  }
+  .tool-title { margin: 0; font-size: 17px; font-weight: 900; }
+  .tool-title small { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--text2); }
+  .tool-url {
+    word-break: break-all; font-size: 13px; line-height: 1.7;
+    color: var(--accent); background: var(--surface2);
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  }
+  .tool-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .tool-actions > * { flex: 1 1 140px; justify-content: center; cursor: pointer; font: inherit; font-weight: 700; }
+  .tool-note { margin: 0; font-size: 12px; line-height: 1.8; color: var(--text2); }
+  .store-btn.primary { background: linear-gradient(135deg, var(--accent-strong), #7C5CFF); color: #14121F; border: none; }
+  .store-btn small { display: block; font-weight: 500; font-size: 11px; color: inherit; opacity: 0.8; }
+  .store-icon { width: 22px; height: 22px; flex-shrink: 0; }
+  .hero-note { margin-top: 14px; font-size: 13px; color: var(--text2); }
+
+  .hero-visual {
+    position: relative;
+    border-radius: 40px;
+    padding: 10px;
+    background: var(--surface);
+    box-shadow: 0 40px 100px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .hero-visual img { display: block; width: 100%; border-radius: 32px; }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 56px; text-align: center; }
+    .hero h1 { font-size: 38px; }
+    .cta-row { justify-content: center; }
+    .hero-visual { max-width: 320px; margin: 0 auto; }
+  }
+  @media (max-width: 480px) {
+    .hero h1 { font-size: 30px; }
+  }
+
+  /* Features */
+  .features { position: relative; z-index: 1; padding: 90px 0; }
+  .section-head { text-align: center; margin-bottom: 56px; }
+  .section-head h2 { font-weight: 900; font-size: 32px; margin: 14px 0 0; }
+  /* ヒーローと同じ折り返しの効かせ方。狭い画面で語の途中で切れないようにする。 */
+  .section-head h2 .nowrap { display: inline-block; }
+
+  .feature-row {
+    display: grid; grid-template-columns: 340px 1fr; gap: 56px; align-items: center;
+    padding: 46px 0; border-bottom: 1px solid var(--line);
+  }
+  .feature-row:last-child { border-bottom: none; }
+  .feature-row.reverse { grid-template-columns: 1fr 340px; }
+  .feature-row.reverse .feature-shot { order: 2; }
+  .feature-shot {
+    border-radius: 28px; padding: 8px; background: var(--surface);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .feature-shot img { display: block; width: 100%; border-radius: 22px; }
+  .feature-text h3 { font-weight: 900; font-size: 26px; line-height: 1.4; margin: 12px 0 14px; white-space: pre-line; }
+  .feature-text p { font-weight: 500; font-size: 15px; line-height: 1.85; color: var(--text2); margin: 0; white-space: pre-line; }
+
+  @media (max-width: 780px) {
+    .feature-row, .feature-row.reverse { grid-template-columns: 1fr; text-align: center; gap: 28px; }
+    .feature-row.reverse .feature-shot { order: 0; }
+    .feature-shot { max-width: 260px; margin: 0 auto; }
+  }
+
+  /* Platforms */
+  .platforms { position: relative; z-index: 1; padding: 20px 0 100px; }
+  .platform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .platform-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 28px;
+    padding: 32px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .platform-card h3 { margin: 0; font-size: 20px; font-weight: 900; display: flex; align-items: center; gap: 10px; }
+  .platform-card p { margin: 0; color: var(--text2); font-size: 14px; line-height: 1.8; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+    padding: 4px 10px; border-radius: 999px; width: fit-content;
+    background: rgba(242,193,78,0.16); color: var(--gold);
+  }
+  /* 公開中の印。金色は「まだ出ていない」を表す色として使っていたので分ける。 */
+  .badge.live { background: rgba(169,139,255,0.18); color: var(--accent); }
+  @media (max-width: 700px) { .platform-grid { grid-template-columns: 1fr; } }
+
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--line);
+    padding: 32px 0; text-align: center;
+    color: var(--text2); font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-a"></div>
+<div class="glow-b"></div>
+
+<header>
+  <nav class="wrap">
+    <a class="brand" href="#top">
+      <img src="assets/icons/icon-180.png" alt="PokeDeck">
+      PokeDeck
+    </a>
+    <div class="nav-links">
+      <a href="#features">特徴</a>
+      <a href="#tool">デッキコード変換</a>
+      <a href="#download">ダウンロード</a>
+      <a class="nav-cta" href="#download">今すぐ試す</a>
+    </div>
+  </nav>
+</header>
+
+<main id="top">
+  <section class="wrap hero">
+    <div>
+      <div class="eyebrow">POKÉMON CARD DECK TOOL</div>
+      <h1><span class="nowrap">大会の入賞デッキを、</span><span class="nowrap">そのままコピー。</span></h1>
+      <p class="lead">デッキ作りも、ひらがな検索も、1つのアプリで。
+8,000枚以上のカードから探して、組んで、画像で残せます。</p>
+      <div class="cta-row">
+        <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">
+          <svg class="store-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.6 2.4c-.4.3-.6.7-.6 1.2v16.8c0 .5.2.9.6 1.2l9.6-9.6-9.6-9.6Z" fill="#00D8FF"/><path d="M16.8 8.4l-3-1.7-4.6 4.6v1.4l4.6 4.6 3-1.7c1-.6 1-2 0-2.6l-1-.6 1-.6c1-.6 1-2 0-2.4Z" fill="#FFD24C"/><path d="M13.8 6.7 4.6 1.5c-.4-.2-.8-.2-1 0l9.4 9.4 3.8-3.8-2-.4Z" fill="#3EE07A"/><path d="M4.6 22.5c.2.1.6.1 1 0l9.2-5.2-3.8-3.8-6.4 9Z" fill="#FF4B5C"/></svg>
+          <span>Google Play<small>Android 版</small></span>
+        </a>
+        <a class="store-btn primary" href="https://apps.apple.com/app/id6747426098" target="_blank" rel="noopener">
+          <svg class="store-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.4c-.03-2.4 1.96-3.55 2.05-3.6-1.12-1.64-2.86-1.86-3.48-1.89-1.48-.15-2.9.87-3.65.87-.75 0-1.9-.85-3.13-.83-1.6.02-3.1.94-3.93 2.37-1.68 2.92-.43 7.24 1.2 9.6.8 1.16 1.75 2.46 3 2.41 1.2-.05 1.66-.78 3.11-.78 1.45 0 1.87.78 3.14.75 1.3-.02 2.13-1.18 2.92-2.35.92-1.35 1.3-2.66 1.32-2.73-.03-.01-2.53-.97-2.55-3.82ZM14.75 5.24c.66-.8 1.1-1.9 1-3.01-.96.04-2.13.64-2.82 1.44-.61.7-1.15 1.83-1 2.9 1.05.08 2.13-.53 2.82-1.33Z"/></svg>
+          <span>App Store<small>iPhone 版</small></span>
+        </a>
+      </div>
+      <div class="hero-note">Android・iPhone どちらも無料でお使いいただけます（iPhone は iOS 17 以降）。</div>
+    </div>
+    <div class="hero-visual">
+      <img src="assets/screenshots/shot1.jpg" alt="マイデッキ一覧の画面" loading="eager">
+    </div>
+  </section>
+
+  <section id="features" class="wrap features">
+    <div class="section-head">
+      <div class="eyebrow" style="text-align:center;">FEATURES</div>
+      <h2>アプリでできること</h2>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-shot"><img src="assets/screenshots/shot1.jpg" alt="マイデッキ一覧" loading="lazy"></div>
+      <div class="feature-text">
+        <div class="eyebrow">MY DECKS</div>
+        <h3>デッキを、
+ひと目で。</h3>
+        <p>タイプ色の帯とドット絵で見分ける。
+長押しで並べ替え、Google ログインで
+別の端末とも同じ内容に。</p>
+      </div>
+    </div>
+
+    <div class="feature-row reverse">
+      <div class="feature-shot"><img src="assets/screenshots/shot2.jpg" alt="大会結果一覧" loading="lazy"></div>
+      <div class="feature-text">
+        <div class="eyebrow">EVENT RESULTS</div>
+        <h3>大会の入賞デッキを、
+毎日。</h3>
+        <p>シティリーグの結果を日付ごとに。
+優勝から入賞まで、代表カードと
+ドット絵で一覧できます。</p>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-shot"><img src="assets/screenshots/shot3.jpg" alt="大会デッキの詳細" loading="lazy"></div>
+      <div class="feature-text">
+        <div class="eyebrow">TOURNAMENT</div>
+        <h3>入賞デッキを、
+そのままコピー。</h3>
+        <p>気になるデッキの60枚を眺めて、
+「マイデッキにコピー」を1回。</p>
+      </div>
+    </div>
+
+    <div class="feature-row reverse">
+      <div class="feature-shot"><img src="assets/screenshots/shot4.jpg" alt="カード検索" loading="lazy"></div>
+      <div class="feature-text">
+        <div class="eyebrow">CARD SEARCH</div>
+        <h3>8,000枚以上から、
+ひらがなのままでも。</h3>
+        <p>打っている途中でも候補が出ます。
+関連カードや再録も一緒に。</p>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-shot"><img src="assets/screenshots/shot5.jpg" alt="絞り込み" loading="lazy"></div>
+      <div class="feature-text">
+        <div class="eyebrow">FILTER</div>
+        <h3>タイプや進化で、
+すぐ絞れる。</h3>
+        <p>押した瞬間に件数が変わるので、
+開き直さずに条件を決められます。</p>
+      </div>
+    </div>
+
+    <div class="feature-row reverse">
+      <div class="feature-shot"><img src="assets/screenshots/shot6.jpg" alt="デッキ編集" loading="lazy"></div>
+      <div class="feature-text">
+        <div class="eyebrow">DECK EDIT</div>
+        <h3>タップで枚数、
+その場で保存。</h3>
+        <p>60枚の進捗を見ながら組み立て。
+吹き出しで増減・詳細・外すまで。</p>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-shot"><img src="assets/screenshots/shot7.jpg" alt="デッキを画像保存" loading="lazy"></div>
+      <div class="feature-text">
+        <div class="eyebrow">SAVE AS IMAGE</div>
+        <h3>デッキを、
+1枚の画像に。</h3>
+        <p>ドット絵を添えて書き出し。
+SNSでの共有に。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tool" class="wrap">
+    <div class="section-head">
+      <div class="eyebrow" style="text-align:center;">DECK CODE</div>
+      <h2><span class="nowrap">デッキコードを、</span><span class="nowrap">送れるリンクに。</span></h2>
+      <p class="tool-lead">公式のデッキコードを貼るだけ。アプリが無くても、この画面で作れます。
+受け取った人はアプリを入れていなくても中身が見えて、入れていれば1回で自分のデッキになります。</p>
+    </div>
+
+    <div class="tool-box">
+      <label class="tool-field">
+        <span>デッキコード</span>
+        <input id="tool-code" type="text" inputmode="latin" autocomplete="off" spellcheck="false"
+               placeholder="FFdFbb-eWiT5V-fkFkbv">
+      </label>
+      <label class="tool-field">
+        <span>デッキ名（任意）</span>
+        <input id="tool-name" type="text" autocomplete="off"
+               placeholder="空のままなら主軸カードの名前になります">
+      </label>
+      <button id="tool-go" class="store-btn primary tool-btn" type="button">リンクを作る</button>
+      <p id="tool-msg" class="tool-msg" role="status" aria-live="polite" hidden></p>
+
+      <div id="tool-out" class="tool-out" hidden>
+        <p class="tool-title" id="tool-deck"></p>
+        <div class="tool-url" id="tool-url"></div>
+        <div class="tool-actions">
+          <button id="tool-copy" class="store-btn primary" type="button">リンクをコピー</button>
+          <a id="tool-open" class="store-btn" href="#" target="_blank" rel="noopener">開いてみる</a>
+        </div>
+        <p class="tool-note">デッキの中身はリンクそのものに入っています。こちらには何も保存していません。
+そのぶん、<strong>一度配ったリンクは取り消せません。</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="download" class="wrap platforms">
+    <div class="section-head">
+      <div class="eyebrow" style="text-align:center;">DOWNLOAD</div>
+      <h2>Android / iOS 対応</h2>
+    </div>
+    <div class="platform-grid">
+      <div class="platform-card">
+        <span class="badge live">公開中</span>
+        <h3>🤖 Android</h3>
+        <p>Google Play で「PokeDeck」として公開しています。無料です。</p>
+        <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">Google Play で入手</a>
+      </div>
+      <div class="platform-card">
+        <span class="badge live">公開中</span>
+        <h3>🍎 iOS</h3>
+        <p>App Store で「PokeDeck」として公開しています。無料です。iOS 17 以降。</p>
+        <a class="store-btn primary" href="https://apps.apple.com/app/id6747426098" target="_blank" rel="noopener">App Store で入手</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  © 2026 PokeDeck. Pokémon and Pokémon character names are trademarks of Nintendo, Creatures, and GAME FREAK. This is an unofficial fan-made tool.
+</footer>
+
+
+<script type="module">
+/**
+ * デッキコード → PokeDeck の共有リンク。
+ *
+ * **全部この画面の中で終わる。** 公式のデッキ頁は
+ * `access-control-allow-origin: *` を返すので、見ている人のブラウザから
+ * 直接取りに行ける。こちらのサーバー（Worker）を通さないので、
+ * 何回使われても費用は増えないし、こちらの IP から公式を叩くことにもならない。
+ *
+ * ただし CORS は約束ではない。公式が閉じたらここだけ動かなくなるので、
+ * そのときは黙って壊れずに「取れなかった」と出す。
+ */
+import { encode } from './d/share-code.js';
+
+const OFFICIAL = 'https://www.pokemon-card.com/deck/confirm.html/deckID/';
+
+/**
+ * 公式のデッキ頁が持っている入れ物。**この順がそのまま並び順になる。**
+ * アプリのデッキ表示（ポケモン → グッズ → どうぐ → サポート → スタジアム →
+ * エネルギー）と同じ並びなので、公式の順のまま詰めれば画面と揃う。
+ * 共有コードは並べ替えずに順を保つ形なので、ここで整えてはいけない。
+ */
+const FIELDS = ['deck_pke', 'deck_gds', 'deck_tech', 'deck_tool', 'deck_sup', 'deck_sta', 'deck_ene', 'deck_ajs'];
+
+const ENERGY_BY_NAME = {
+  '基本草エネルギー': 'reef', '基本炎エネルギー': 'fire', '基本水エネルギー': 'water',
+  '基本雷エネルギー': 'thunder', '基本超エネルギー': 'esper', '基本闘エネルギー': 'fight',
+  '基本悪エネルギー': 'dark', '基本鋼エネルギー': 'metal',
+  '基本フェアリーエネルギー': 'fairy', '基本ドラゴンエネルギー': 'dragon',
+};
+
+const $ = (id) => document.getElementById(id);
+
+let index = null;
+// 公式は no-store を返すのでブラウザが覚えてくれない。同じデッキを
+// 何度も取りに行かないよう、この画面で覚えておく。
+const seen = new Map();
+
+function deckIdOf(input) {
+  const text = (input || '').trim();
+  const matched = /deckID\/([A-Za-z0-9-]+)/.exec(text);
+  if (matched) return matched[1];
+  return /^[A-Za-z0-9-]{6,}$/.test(text) ? text : null;
+}
+
+async function loadIndex() {
+  if (index) return index;
+  const res = await fetch('/cards-min.json');
+  if (!res.ok) throw new Error('index');
+  index = await res.json();
+  return index;
+}
+
+async function fetchDeck(deckId) {
+  if (seen.has(deckId)) return seen.get(deckId);
+  const res = await fetch(OFFICIAL + deckId);
+  if (!res.ok) throw new Error('notfound');
+  const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+
+  const values = new Map();
+  for (const el of doc.querySelectorAll('input[name^="deck_"]')) values.set(el.name, el.value || '');
+
+  const cards = [];
+  for (const field of FIELDS) {
+    for (const part of (values.get(field) || '').split('-').filter(Boolean)) {
+      // 「カードID_枚数_なにか」。3 つ目は用途が分からないので触らない。
+      const [id, count] = part.split('_');
+      const cardId = Number(id);
+      const n = Number(count);
+      if (Number.isInteger(cardId) && cardId > 0 && Number.isInteger(n) && n > 0) {
+        cards.push({ cardId, count: n });
+      }
+    }
+  }
+  seen.set(deckId, cards);
+  return cards;
+}
+
+/** 一番多く入っている基本エネルギーの色。基本が 1 枚も無ければ「無し」。 */
+function pickEnergy(cards, idx) {
+  const tally = new Map();
+  for (const card of cards) {
+    const energy = ENERGY_BY_NAME[(idx[card.cardId] || [])[0]];
+    if (energy) tally.set(energy, (tally.get(energy) || 0) + card.count);
+  }
+  let best = null;
+  let most = 0;
+  for (const [energy, count] of tally) if (count > most) { best = energy; most = count; }
+  return best;
+}
+
+function say(text) {
+  $('tool-msg').textContent = text;
+  $('tool-msg').hidden = !text;
+}
+
+async function make() {
+  const deckId = deckIdOf($('tool-code').value);
+  $('tool-out').hidden = true;
+  if (!$('tool-code').value.trim()) {
+    say('デッキコードを貼ってください。');
+    return;
+  }
+  if (!deckId) {
+    say('デッキコードの形が違うようです。公式サイトの「デッキを表示」の URL をそのまま貼っても大丈夫です。');
+    return;
+  }
+
+  $('tool-go').disabled = true;
+  say('公式サイトからデッキを読み込んでいます…');
+  try {
+    const [cards, idx] = await Promise.all([fetchDeck(deckId), loadIndex()]);
+    if (cards.length === 0) {
+      // 公式は知らない ID にも 200 を返す（中身が空の頁になる）。
+      // 「無い」と「空」は見分けられないので、まとめて伝える。
+      say('そのコードのデッキが見つかりませんでした。コードを確かめてください。');
+      return;
+    }
+
+    // 主軸は先頭のポケモン。公式の並びでは、たいていデッキの軸が先に来る。
+    const main = (cards.find((c) => (idx[c.cardId] || [])[2] === 'ポケモン') || cards[0]).cardId;
+    const name = $('tool-name').value.trim() || (idx[main] || [])[0] || '';
+    const url = `${location.origin}/d/?c=${encode({
+      name, cards, energyName: pickEnergy(cards, idx), mainCardId: main, subCardId: null,
+    })}`;
+
+    const total = cards.reduce((sum, c) => sum + c.count, 0);
+    $('tool-deck').innerHTML = '';
+    $('tool-deck').append(name || '名前のないデッキ');
+    const sub = document.createElement('small');
+    sub.textContent = `${total} 枚 ・ ${cards.length} 種類`;
+    $('tool-deck').appendChild(sub);
+    $('tool-url').textContent = url;
+    $('tool-open').href = url;
+    $('tool-copy').textContent = 'リンクをコピー';
+    $('tool-out').hidden = false;
+    say('');
+  } catch (err) {
+    // 取れない理由は「コードが違う」か「公式側の設定が変わった」のどちらか。
+    // 見ている人には区別がつかないので、両方を書いておく。
+    say('公式サイトからデッキを取れませんでした。コードが違うか、公式サイト側の設定が変わった可能性があります。しばらくしてからもう一度お試しください。');
+  } finally {
+    $('tool-go').disabled = false;
+  }
+}
+
+$('tool-go').addEventListener('click', make);
+$('tool-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') make(); });
+$('tool-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') make(); });
+
+$('tool-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('tool-url').textContent);
+    $('tool-copy').textContent = 'コピーしました';
+  } catch {
+    $('tool-copy').textContent = '長押しでコピーしてください';
+  }
+});
+</script>
+
+</body>
+</html>
