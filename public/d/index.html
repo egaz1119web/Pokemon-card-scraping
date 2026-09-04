@@ -202,7 +202,13 @@ function showFallback(html) {
  */
 let index = null;
 async function loadIndex(url) {
-  const res = await fetch(url, { cache: 'force-cache' });
+  // **force-cache にしないこと。**
+  // force-cache は期限切れでも構わずキャッシュを返す。索引にカードを足しても、
+  // 一度この頁を開いたことがある人には古い索引が出続け、足したカードが
+  // いつまでも「カード 49573」の灰色の枠のままになる。
+  // _headers 側で max-age=300 と ETag を付けてあるので、既定の扱いに任せれば
+  // 5 分は取りに行かず、そのあとも中身が変わっていなければ 304 で終わる。
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   return res.json();
 }
