@@ -13,7 +13,8 @@
     "test": "node --test 'test/*.test.mjs'",
     "compare": "tsx src/compare.ts",
     "events": "tsx src/events.ts",
-    "events:pi": "bash scripts/pi-events.sh"
+    "events:pi": "bash scripts/pi-events.sh",
+    "deck-url": "tsx src/deck-url.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

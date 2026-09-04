@@ -126,6 +126,79 @@ export function decode(code) {
   }
 }
 
+/** 数を varint で詰める。読む側の Cursor.varint と対。 */
+function pushVarint(out, value) {
+  let v = value >>> 0;
+  for (;;) {
+    if (v < 0x80) {
+      out.push(v);
+      return;
+    }
+    out.push((v & 0x7f) | 0x80);
+    v >>>= 7;
+  }
+}
+
+/** ジグザグ詰め。0,-1,1,-2,2… を 0,1,2,3,4… に寄せる。unzigzag と対。 */
+function zigzag(value) {
+  return ((value << 1) ^ (value >> 31)) >>> 0;
+}
+
+/** byte 列を Base64URL（詰め物なし）へ。fromBase64Url と対。 */
+function toBase64Url(bytes) {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * 共有コードを作る。`decode` が返すものをそのまま渡せる。
+ *
+ * アプリが作ったコードと**同じ並びで**出す。試験（share-code.test.mjs）が
+ * goldens を decode → encode して元に戻ることを見ているので、ずれれば落ちる。
+ *
+ * **カードは渡された順のまま入れる。並べ替えないこと。** v2 の要点は
+ * 「送り手の画面に並んでいた順を保つ」ことで、ここで整えると意味が無くなる。
+ *
+ * 主軸・副軸は cardId で渡す。`cards` の何番目かに直して 1 byte で持つので、
+ * 見つからなければ「無し」（0xFF）になる。エネルギーも綴りが合わなければ無し。
+ */
+export function encode(deck) {
+  const cards = deck.cards ?? [];
+  const out = [VERSION];
+
+  const energy = ENERGY_NAMES.indexOf(deck.energyName ?? '');
+  out.push(energy === -1 ? NONE : energy);
+
+  const indexOf = (cardId) => {
+    if (cardId == null) return NONE;
+    const at = cards.findIndex((c) => c.cardId === cardId);
+    // 添字は 1 byte しかない。0xFF は「無し」なので、そこに届く並びは持てない。
+    return at === -1 || at >= NONE ? NONE : at;
+  };
+  out.push(indexOf(deck.mainCardId));
+  out.push(indexOf(deck.subCardId));
+
+  const name = new TextEncoder().encode(deck.name ?? '');
+  pushVarint(out, name.length);
+  for (const b of name) out.push(b);
+
+  pushVarint(out, cards.length);
+  let previous = 0;
+  for (const card of cards) {
+    if (!(card.cardId > 0)) throw new RangeError(`cardId が正でない: ${card.cardId}`);
+    // 並べ替えていないので差は前にも後ろにも動く。負を跨げる詰め方で書く。
+    pushVarint(out, zigzag(card.cardId - previous));
+    pushVarint(out, card.count);
+    previous = card.cardId;
+  }
+
+  const sum = fletcher16(out);
+  // 検査の 2 byte は下位から。読む側が (末尾 << 8) | 末尾の 1 つ前 で組み直す。
+  out.push(sum & 0xff, (sum >> 8) & 0xff);
+  return toBase64Url(out);
+}
+
 /** URL や貼り付けた文字列からコードを取り出す。Kotlin の DeckShareLink と同じ扱い。 */
 export function extractCode(input) {
   const text = (input || '').trim();

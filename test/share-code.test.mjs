@@ -11,7 +11,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decode, extractCode, ENERGY_NAMES, VERSION } from '../public/d/share-code.js';
+import { decode, encode, extractCode, ENERGY_NAMES, VERSION } from '../public/d/share-code.js';
 
 const goldens = [
   {
@@ -61,6 +61,57 @@ for (const { label, code, expect } of goldens) {
     assert.deepEqual(deck.cards.map((c) => [c.cardId, c.count]), expect.cards);
   });
 }
+
+for (const { label, code, expect } of goldens) {
+  test(`開いて詰め直すと元のコードに戻る — ${label}`, () => {
+    // **ここが合わないと、こちらが作ったリンクだけアプリと形が違うことになる。**
+    // 大会の入賞デッキを共有 URL にする道具（src/deck-url.ts）が encode を使う。
+    // 読めるだけでは足りず、アプリが出すものと 1 byte まで同じでないといけない。
+    assert.equal(encode(decode(code)), code, label);
+  });
+}
+
+test('詰めて開くと元の中身に戻る', () => {
+  const deck = {
+    name: 'ドラパルトex（CL優勝）',
+    energyName: 'esper',
+    mainCardId: 48656,
+    subCardId: 45771,
+    // 昇順ではない並び。差が負に振れる箇所を含める。
+    cards: [
+      { cardId: 48656, count: 3 },
+      { cardId: 45771, count: 4 },
+      { cardId: 45770, count: 4 },
+      { cardId: 49026, count: 1 },
+      { cardId: 1, count: 8 },
+    ],
+  };
+  const back = decode(encode(deck));
+  assert.equal(back.name, deck.name);
+  assert.equal(back.energyName, deck.energyName);
+  assert.equal(back.mainCardId, deck.mainCardId);
+  assert.equal(back.subCardId, deck.subCardId);
+  assert.deepEqual(back.cards, deck.cards);
+});
+
+test('主軸とエネルギーが分からないときは「無し」で詰める', () => {
+  // 主軸に持っていないカードを指しても、綴りの違うエネルギーを渡しても、
+  // 落ちずに「無し」になること。大会デッキは名前もエネルギーも公式には無く、
+  // こちらで推し量って入れるので、外したときに壊れては困る。
+  const back = decode(
+    encode({ name: '', energyName: 'みず', mainCardId: 99999, subCardId: null, cards: [{ cardId: 5, count: 1 }] }),
+  );
+  assert.equal(back.name, '');
+  assert.equal(back.energyName, null);
+  assert.equal(back.mainCardId, null);
+  assert.equal(back.subCardId, null);
+});
+
+test('カードが 1 枚も無くても詰められる', () => {
+  const back = decode(encode({ name: '空', energyName: null, mainCardId: null, subCardId: null, cards: [] }));
+  assert.deepEqual(back.cards, []);
+  assert.equal(back.name, '空');
+});
 
 test('60 枚のデッキでも URL が QR に収まる長さ', () => {
   const url = `https://pokedeck.op-sarada.workers.dev/d?c=${goldens[0].code}`;

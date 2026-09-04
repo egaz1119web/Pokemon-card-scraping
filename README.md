@@ -183,7 +183,7 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 | ファイル | 役目 |
 |---|---|
 | `public/d/index.html` | ページ本体 |
-| `public/d/share-code.js` | 共有コードを開く。アプリ側 `DeckShareCode.kt` / `.swift` と同じ並びを扱う |
+| `public/d/share-code.js` | 共有コードの読み書き。アプリ側 `DeckShareCode.kt` / `.swift` と同じ並びを扱う |
 | `worker/index.js` | `/d/` の OGP をデッキごとに書き換える。下記 |
 | `public/cards-min.json` | カード ID → 名前・画像・種別。5MB の `cards.json` は重すぎるので削ったもの |
 | `public/.well-known/assetlinks.json` | Android の App Links の検証用 |
@@ -249,6 +249,45 @@ Worker で解いて `<head>` を差し替える。
 **同じ並び**を置いてあり、両方に同じ並びを固定した試験がある。片方だけ直すと、
 同じデッキでも作った OS によって相手の見る順番が変わる。
 
+### 大会デッキを共有 URL にする（`src/deck-url.ts`）
+
+公式のデッキ ID を PokeDeck の共有 URL に直す。大会の入賞デッキを SNS に
+出すための道具。
+
+```bash
+npm run deck-url -- FFdFbb-eWiT5V-fkFkbv
+npm run deck-url -- <ID> --name "ドラパルトex（CL優勝）" --main 48656
+```
+
+材料はすべて手元にある。
+
+| 要るもの | 出どころ |
+|---|---|
+| デッキ ID | `public/events.json`（大会ごとの 1〜8 位ぶん） |
+| 60 枚の中身 | `deck/confirm.html/deckID/<ID>` の `<input name="deck_pke" value="…">` |
+| 名前・区分・絵 | `public/cards-min.json` |
+| 主軸カード | `public/events.json` の `firstImage` など（公式が選んだ代表カード） |
+
+`confirm.html` は素の HTML に `カードID_枚数_…` を `-` でつないだ形で持っている。
+`players` 側と違ってボット対策は無く、素の fetch で取れる。
+
+**並べ替えないこと。**公式の入れ物は `deck_pke` → `deck_gds` → `deck_tech` →
+`deck_tool` → `deck_sup` → `deck_sta` → `deck_ene` の順で、これはアプリのデッキ
+表示と同じ並び。そのまま詰めれば送り手の画面と揃う。`deck_ajs` は中身の入った
+例を見たことがないが、入っていたら黙って捨てずに知らせる。
+
+デッキ名は公式側に無いので、主軸カードの名前で代える（`--name` で上書き）。
+エネルギーは一番多く入っている基本エネルギーの色にする。どちらも外したときは
+「無し」になるだけで、リンクは壊れない。
+
+実データ 21 本での URL の長さは 164〜211 字（中央 182 字）。カードの種類が
+30 を超えるデッキは 200 字を越えることがある。
+
+**公式のデッキ ID とは別物を作っている。**公式の ID は公式サイトでしか開けず、
+中身を見るには公式のデッキ構築ツールへ行くことになる。こちらはリンク自体に
+60 枚を持っていて、アプリを入れていない人にもその場で見え、入れている人は
+そのまま取り込める。
+
 ### 形を変えるときの約束
 
 `share-code.js` と アプリの `DeckShareCode.kt` / `DeckShareCode.swift` は
@@ -298,8 +337,10 @@ QR から開いた URL は **OS がアプリへ直接渡す**（ブラウザを�
 npm ci
 npm run build      # 差分更新（新規カードのみ詳細を取得）
 npm run validate   # 旧データと突き合わせて移植の正しさを確認
-npm run test       # デッキ共有コードの読み取り
+npm run test       # デッキ共有コードの読み書き
 npm run typecheck
+
+npm run deck-url -- <デッキID>   # 公式のデッキ ID → PokeDeck の共有 URL
 ```
 
 環境変数:

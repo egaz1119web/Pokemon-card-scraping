@@ -5,6 +5,9 @@
     "moduleResolution": "bundler",
     // page.evaluate の中はブラウザ側で動くため DOM の型が要る
     "lib": ["ES2022", "DOM"],
+    // 共有コードの読み書き（public/d/share-code.js）を src から使うため。
+    // 型は JS から推論させる。checkJs は付けない。
+    "allowJs": true,
     "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
