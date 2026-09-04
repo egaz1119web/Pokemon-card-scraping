@@ -82,3 +82,53 @@ export async function fetchAllListEntries(
   }
   return entries;
 }
+
+/**
+ * デッキ構築ツールのカード検索。
+ *
+ * 公式は**カード検索を 2 つ持っている**。上の `resultAPI.php` は
+ * カード検索ページのもので、こちらはデッキを組む画面のもの。
+ * 後者のほうが広い（XY で 5,581 件 対 6,198 件、BW で 20,798 件 対 21,742 件）。
+ *
+ * 公式のデータベースには同じカードのレコードが 2 つあることがある。
+ * 048622 と 049800（どちらも「ロケット団のゴルバット」）は詳細ページが
+ * ID 以外まったく同じで、カード検索は片方に畳んで見せ、こちらは畳まない。
+ * **デッキ ID はどちらの ID でも指せる。**アプリのデッキコード取り込みは
+ * cardId をそのまま持つので、カード検索だけを見ていると
+ * 「アプリは知っているが、デッキ共有ページは名前も絵も引けない」
+ * カードが生まれる（049573「ポケパッド」で実際に起きた）。
+ *
+ * そのため取得の網はこちらで張る。ただし `standard` / `extra` の印は
+ * 引き続き `resultAPI.php` の結果で付ける。アプリのカード検索はその印で
+ * 絞っているので、こちらを印に使うと畳まれていた重複が検索結果に出てしまう。
+ */
+function deckPageUrl(page: number, regulation: string): string {
+  const q = new URLSearchParams({
+    keyword: "",
+    regulation_deck_itm: regulation,
+    sm_and_keyword: "true",
+    page: String(page),
+  });
+  return `${ORIGIN}/deck/deckCardSearch.php?${q}`;
+}
+
+export async function fetchAllDeckEntries(
+  regulation = "XY",
+  delayMs = 250,
+): Promise<ListEntry[]> {
+  const first = await fetchJson<ResultApiResponse>(deckPageUrl(1, regulation));
+  if (first.result !== 1) throw new Error(`deckCardSearch error: ${first.errMsg}`);
+
+  const entries = [...first.cardList];
+  for (let page = 2; page <= first.maxPage; page++) {
+    await sleep(delayMs);
+    const res = await fetchJson<ResultApiResponse>(deckPageUrl(page, regulation));
+    if (res.result !== 1) throw new Error(`deckCardSearch error on page ${page}: ${res.errMsg}`);
+    entries.push(...res.cardList);
+  }
+
+  if (entries.length !== first.hitCnt) {
+    throw new Error(`件数不一致: hitCnt=${first.hitCnt} だが ${entries.length} 件しか取得できていない`);
+  }
+  return entries;
+}

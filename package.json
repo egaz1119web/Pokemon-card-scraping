@@ -8,7 +8,6 @@
   },
   "scripts": {
     "build": "tsx src/build.ts",
-    "fill-gaps": "tsx src/fill-gaps.ts",
     "validate": "tsx src/validate.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test 'test/*.test.mjs'",

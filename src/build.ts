@@ -17,7 +17,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { fetchCard } from "./detail.js";
-import { fetchAllListEntries, cardIdOf, uniqueByCardId } from "./list.js";
+import { fetchAllListEntries, fetchAllDeckEntries, cardIdOf, uniqueByCardId } from "./list.js";
 import { sleep, BlockedError } from "./http.js";
 import type { CardRecord, ListEntry, State } from "./types.js";
 import { normalizeKeyOrder } from "./types.js";
@@ -232,13 +232,35 @@ async function main(): Promise<void> {
     }
   }
 
+  // 取得の網はデッキ構築ツールの検索で張る（[fetchAllDeckEntries] の説明を参照）。
+  // カード検索より広く、**デッキ ID が指しうるカードの集合そのもの**。
+  // 印を付けるのは上の 2 つの役目なので、ここは「取りこぼさない」ためだけに使う。
+  const deckLive = uniqueByCardId(await fetchAllDeckEntries("XY"));
+  console.log(`デッキ構築（スタンダード） ${deckLive.length} 件`);
+  let deckExtraLive: ListEntry[] | null = null;
+  if (WITH_EXTRA) {
+    try {
+      deckExtraLive = uniqueByCardId(await fetchAllDeckEntries("BW"));
+      console.log(`デッキ構築（エクストラ） ${deckExtraLive.length} 件`);
+    } catch (err) {
+      console.warn(`デッキ構築（エクストラ）の一覧を取得できなかったので今回は見送る: ${err}`);
+    }
+  }
+
   const liveIds = new Set(live.map(cardIdOf));
   const extraIds = extraLive ? new Set(extraLive.map(cardIdOf)) : null;
+  const deckIds = new Set(deckLive.map(cardIdOf));
 
   // cards.json が受け持つ範囲。いま一覧にあるものと、過去に取り込んだものすべて。
-  const standardIds = new Set([...liveIds, ...master.map((c) => c.cardId)]);
+  // デッキ構築のスタンダードもここに含める。カード検索に出ないだけで、
+  // スタンダードのデッキに入れられるカードだから。
+  const standardIds = new Set([...liveIds, ...deckIds, ...master.map((c) => c.cardId)]);
   // エクストラにしか無いカード。ここが cards-extra.json の中身になる。
-  const extraOnly = (extraLive ?? []).filter((e) => !standardIds.has(cardIdOf(e)));
+  const extraOnly = uniqueByCardId([...(extraLive ?? []), ...(deckExtraLive ?? [])]).filter(
+    (e) => !standardIds.has(cardIdOf(e)),
+  );
+  // カード検索には出ないが、デッキ構築の検索には出るカード。cards.json 側で受け持つ。
+  const deckOnly = deckLive.filter((e) => !liveIds.has(cardIdOf(e)));
 
   const progress = readJson<RefreshProgress>(REFRESH_PROGRESS, { startedAt: "", done: [] });
   const alreadyRefreshed = new Set(progress.done);
@@ -257,12 +279,18 @@ async function main(): Promise<void> {
   // エクストラには残っているカード（2,324 件）は BW 一覧には出てくるが、
   // cards.json 側が受け持つので extraOnly には入らない。両方から漏れるので
   // ここで拾い直さないと、全件更新の対象からまるごと抜け落ちる。
-  const covered = new Set([...liveIds, ...extraOnly.map(cardIdOf)]);
+  const covered = new Set([...liveIds, ...deckIds, ...extraOnly.map(cardIdOf)]);
   const retainedStandardEntries = master.filter((c) => !covered.has(c.cardId)).map(pseudoEntry);
   const retainedExtraEntries = extraMaster.filter((c) => !covered.has(c.cardId)).map(pseudoEntry);
   // 並び順が効く。スタンダード側を先に片づけないと、エクストラ 12,893 件を
   // 取り終わるまで「未完了」が解けず、version が上がらないままになる。
-  const everything = [...live, ...retainedStandardEntries, ...extraOnly, ...retainedExtraEntries];
+  const everything = [
+    ...live,
+    ...deckOnly,
+    ...retainedStandardEntries,
+    ...extraOnly,
+    ...retainedExtraEntries,
+  ];
 
   let targets: ListEntry[];
   if (REFRESH_ALL) {
@@ -283,9 +311,13 @@ async function main(): Promise<void> {
   } else {
     // スタンダードの新着を先に取る。エクストラの積み残しに埋もれさせない。
     const newStandard = live.filter((e) => !byId.has(cardIdOf(e)));
+    const newDeck = deckOnly.filter((e) => !byId.has(cardIdOf(e)));
     const newExtra = extraOnly.filter((e) => !byId.has(cardIdOf(e)));
-    targets = [...newStandard, ...newExtra];
-    console.log(`新規カード: スタンダード ${newStandard.length} 件 / エクストラ ${newExtra.length} 件`);
+    targets = [...newStandard, ...newDeck, ...newExtra];
+    console.log(
+      `新規カード: スタンダード ${newStandard.length} 件 / ` +
+        `デッキ構築のみ ${newDeck.length} 件 / エクストラ ${newExtra.length} 件`,
+    );
   }
   const trackProgress = REFRESH_ALL || REFRESH_DIRTY;
 
@@ -331,7 +363,16 @@ async function main(): Promise<void> {
     .filter((c) => !liveIds.has(c.cardId))
     .sort((a, b) => a.sortId - b.sortId)
     .map((c) => c.cardId);
-  const ordered = compose([...live.map(cardIdOf), ...retainedStandard], byId, liveIds, extraIds);
+  // カード検索に出ないカードを今回はじめて取ったぶん。末尾に足す。
+  // ここを入れないと compose の材料に入らず、取ったのに配信から落ちる。
+  const masterIds = new Set(master.map((c) => c.cardId));
+  const addedStandard = deckOnly.map(cardIdOf).filter((id) => !masterIds.has(id));
+  const ordered = compose(
+    [...live.map(cardIdOf), ...retainedStandard, ...addedStandard],
+    byId,
+    liveIds,
+    extraIds,
+  );
 
   // エクストラ側も同じ考え方。sortId はこのファイルの中で 1 から数え直す
   // （アプリはどちらも使っておらず、通し番号にすると毎日全行が変わってしまう）。
