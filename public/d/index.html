@@ -123,6 +123,24 @@
   footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--text3); font-size: 12px; line-height: 1.8; }
   footer a { color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
   .hidden { display: none !important; }
+
+  /* 拡大して見るための覆い。並びの大きさでは絵柄もワザの文も読めないため。
+     出すのは絵だけで、どこを触っても閉じる。 */
+  .zoom {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center; padding: 20px;
+    background: rgba(8, 7, 12, 0.9);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    cursor: zoom-out; animation: zoom-in .16s ease-out;
+  }
+  .zoom img {
+    max-width: min(100%, 420px); max-height: 100%;
+    border-radius: 10px; box-shadow: 0 24px 60px rgba(0,0,0,.6);
+  }
+  @keyframes zoom-in { from { opacity: 0; } }
+  .card img { cursor: zoom-in; }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) { .zoom { animation: none; } }
 </style>
 </head>
 <body>
@@ -372,6 +390,61 @@ function renderCards(deck) {
   $('sections').appendChild(out);
 }
 
+/**
+ * カードを拡大して見せる。
+ *
+ * 並べている絵はすでに公式の large をそのまま縮めて出しているので、
+ * 拡大しても取りに行くものは無い（同じ URL がブラウザに載っている）。
+ *
+ * **戻るで閉じられるようにしておくこと。** 携帯でこの頁を開く人は
+ * LINE や X から来ていて、拡大したまま戻るを押すとデッキごと消えてしまう。
+ * 履歴を 1 つ積んでおけば、戻るは「拡大を閉じる」で終わる。
+ */
+function setUpZoom() {
+  let layer = null;
+
+  function open(src, alt) {
+    if (layer) return;
+    layer = document.createElement('div');
+    layer.className = 'zoom';
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = alt;
+    layer.appendChild(img);
+    layer.addEventListener('click', () => close());
+    document.body.appendChild(layer);
+    document.body.style.overflow = 'hidden';
+    history.pushState({ zoom: true }, '');
+  }
+
+  function close({ back = true } = {}) {
+    if (!layer) return;
+    layer.remove();
+    layer = null;
+    document.body.style.overflow = '';
+    // 触って閉じたときは、積んだ履歴も戻して辻褄を合わせる。
+    // 戻るで閉じたときは既に戻っているので、もう一度戻すと頁を離れてしまう。
+    if (back && history.state && history.state.zoom) history.back();
+  }
+
+  const from = (target) => {
+    const cell = target.closest('.card');
+    const img = cell && cell.querySelector('img');
+    if (img) open(img.src, img.alt);
+  };
+
+  $('sections').addEventListener('click', (e) => from(e.target));
+  $('sections').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    from(e.target);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+  window.addEventListener('popstate', () => close({ back: false }));
+}
+
 function section(name, cards) {
   const el = document.createElement('section');
   const head = document.createElement('div');
@@ -387,6 +460,10 @@ function section(name, cards) {
     const cell = document.createElement('div');
     cell.className = 'card';
     if (card.image) {
+      // 絵があるものだけ拡大できる。引けなかったカードは押しても何も無いので触らせない。
+      cell.tabIndex = 0;
+      cell.setAttribute('role', 'button');
+      cell.setAttribute('aria-label', `${card.name}を大きく見る`);
       const img = document.createElement('img');
       img.src = IMAGE_BASE + card.image;
       img.alt = card.name;
@@ -409,6 +486,7 @@ function section(name, cards) {
   return el;
 }
 
+setUpZoom();
 main();
 </script>
 </body>
