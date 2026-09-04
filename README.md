@@ -238,13 +238,12 @@ Firebase では別の出来事として並び、合計が取れなくなる。
 `public/index.html` と `public/d/index.html` の `</head>` の直前。
 無料・無制限で、Cookie を置かず個人を追わない。
 
-**トークンを入れるまで何も読み込まない。**素で貼ると、届け先が無いのに
-訪問者のブラウザから毎回リクエストが飛ぶ。発行は Cloudflare の管理画面
-（Web Analytics → サイトを追加 → ホスト名 `pokedeck.op-sarada.workers.dev`）。
+トークン（`794e…`）は Cloudflare の管理画面で `pokedeck.op-sarada.workers.dev`
+に対して発行したもの。ページの HTML に出るので秘密ではない。
 
-```bash
-sed -i '' 's/__CF_BEACON_TOKEN__/<発行されたトークン>/' public/index.html public/d/index.html
-```
+読み込みはトークンが入っているときだけ走る。`__CF_BEACON_TOKEN__` のような
+未設定の値のままだと何も読み込まない——素で貼ると、届け先が無いのに
+訪問者のブラウザから毎回リクエストが飛ぶため。
 
 X や LINE の見出し取得（OGP のクローラ）は JavaScript を動かさないので
 ここには数えられない。つまりこの数字は、実際に人が開いた回数に近い。

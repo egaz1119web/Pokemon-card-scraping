@@ -156,10 +156,11 @@
 -->
 <script>
   (function () {
-    var token = '__CF_BEACON_TOKEN__';
+    var token = '794e8304fd9740688ee6a38cf6d23a87';
     if (token.charAt(0) === '_') return;
     var s = document.createElement('script');
-    s.defer = true;
+    // Cloudflare が配っている書き方に合わせる。module は既定で遅延読み込み。
+    s.type = 'module';
     s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
     s.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
     document.head.appendChild(s);
