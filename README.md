@@ -184,8 +184,52 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 |---|---|
 | `public/d/index.html` | ページ本体 |
 | `public/d/share-code.js` | 共有コードを開く。アプリ側 `DeckShareCode.kt` / `.swift` と同じ並びを扱う |
+| `worker/index.js` | `/d/` の OGP をデッキごとに書き換える。下記 |
 | `public/cards-min.json` | カード ID → 名前・画像・種別。5MB の `cards.json` は重すぎるので削ったもの |
 | `public/.well-known/assetlinks.json` | Android の App Links の検証用 |
+
+### OGP（`worker/index.js`）
+
+**共有リンクが貼られた先で、デッキ名と主軸カードの絵が出るようにする。**
+
+`index.html` に書いてある OGP は固定文言なので、静的配信のままだと誰が何を
+貼っても同じ文字だけ・絵なしになる。X のタイムラインでは絵の無いリンクは
+ほぼ見られないので、せっかく共有された 1 本 1 本が黙って流れていた。
+
+デッキ名も主軸カードの ID も `c=` の中にある（保存先を持たない設計の副産物）。
+Worker で解いて `<head>` を差し替える。
+
+| 出るもの | 中身 |
+|---|---|
+| `og:title` | デッキ名 |
+| `og:description` | 枚数・種類数・主軸カード名 |
+| `og:image` | 主軸カードの公式画像 |
+| `<h1>` | デッキ名（JS を動かさないクローラ向け。人にも読み込み中の文字が出なくなる） |
+
+読めない `c=` や `c=` 無しのときは、元の固定文言のまま返す。
+
+**動かすのは `/d` と `/d/` だけ。**`wrangler.jsonc` の `run_worker_first` で
+絞ってある。ここを広げるとカードデータ（5MB / 8MB）まで Worker 課金になる。
+静的配信のままなら、そちらはリクエストも帯域も無料。
+
+**`/d` は `/d/` へ 307 で送ること。**静的配信は元々こう振る舞っていて、
+ページの `./share-code.js` はその前提。`/d` のまま 200 を返すと `./` が `/` に
+なって 404 し、OGP だけ正しくてデッキが空、という気づきにくい壊れ方をする。
+
+索引（`cards-min.json`）は `JSON.parse` していない。680KB を丸ごと解くと、
+欲しいのが 1 件でも無料枠の CPU 時間（1 リクエスト 10ms）に触れかねないため、
+文字列のまま切り出している。**切り出しの間違いはそのカードだけ静かに絵が
+出なくなる**ので、全件を `JSON.parse` と突き合わせる試験を置いてある
+（`test/og-index.test.mjs`）。カード名に括弧が入るもの（`ナッシー[Exeggutor]`）で
+実際に踏んだ。
+
+`og:image` は公式サイトの画像をそのまま指している。X や LINE のクローラは
+公式から直に取りに行く。手元に写して配ると公式の絵を自分の配信に載せる
+ことになるため、こちらを選んだ。
+
+カードは縦長（868x1212）なので、`summary_large_image` では上下が切られて絵の
+真ん中あたりが出る。カード名まで見せたいなら 1200x630 をこちらで組んで返す
+しかないが、日本語の字を積む必要があり今は見送っている。
 
 ### カードの並び
 
@@ -432,13 +476,18 @@ Cloudflare のダッシュボードから **Workers & Pages → Create → Conne
 | Deploy command | `npx wrangler deploy`（既定のまま） |
 
 デプロイの内容は `wrangler.jsonc` が持っている。`public/` を静的アセットとして
-アップロードするだけで、Worker スクリプト（`main`）は無い。
+アップロードし、共有ページ（`/d`）だけ Worker を噛ませる。
 
 ```jsonc
 {
   "name": "pokedeck",
   "compatibility_date": "2026-08-24",
-  "assets": { "directory": "./public" }
+  "main": "worker/index.js",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/d", "/d/"]
+  }
 }
 ```
 
