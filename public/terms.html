@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>利用規約 ― PokeDeck</title>
+<meta name="description" content="ポケモンカードのデッキ管理アプリ「PokeDeck」（Android / iOS）の利用規約。">
+<meta property="og:title" content="利用規約 ― PokeDeck">
+<meta property="og:description" content="PokeDeck を使うときの約束ごと。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://pokedeck.op-sarada.workers.dev/terms">
+<meta property="og:image" content="https://pokedeck.op-sarada.workers.dev/assets/icons/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* 色と字は紹介ページ（index.html）・プライバシーポリシー（privacy.html）と同じ。
+     アプリの設定から開く先なので、別のサイトに見えては困る。 */
+  :root {
+    --bg: #0F0E15;
+    --surface: #1F1E2A;
+    --surface2: #171622;
+    --text: #F2F0F7;
+    --text2: #A9A5B8;
+    --text3: #7C7790;
+    --accent: #C9B6FF;
+    --accent-strong: #A98BFF;
+    --line: rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.9;
+  }
+  a { color: var(--accent); }
+  .glow {
+    position: fixed;
+    top: -220px; left: 50%; transform: translateX(-50%);
+    width: 760px; height: 520px;
+    background: radial-gradient(closest-side, rgba(169,139,255,.16), transparent);
+    pointer-events: none;
+  }
+  .wrap {
+    position: relative;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  .eyebrow {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .18em;
+    color: var(--accent);
+  }
+  .eyebrow a { text-decoration: none; }
+  h1 {
+    font-size: clamp(26px, 5vw, 34px);
+    font-weight: 900;
+    margin: 10px 0 6px;
+    text-wrap: balance;
+  }
+  .updated { color: var(--text3); font-size: 13px; margin: 0 0 28px; }
+  h2 {
+    font-size: 18px;
+    font-weight: 900;
+    margin: 40px 0 10px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  p { margin: 0 0 12px; color: var(--text2); font-size: 15px; }
+  ul { margin: 0 0 14px; padding-left: 1.3em; color: var(--text2); font-size: 15px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--text); font-weight: 700; }
+  .panel {
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin: 0 0 16px;
+  }
+  .panel p:last-child, .panel ul:last-child { margin-bottom: 0; }
+  .lead { color: var(--text); font-size: 16px; }
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--text3);
+    font-size: 13px;
+  }
+</style>
+<!--
+  Cloudflare Web Analytics。無料・無制限で、Cookie を置かず個人を追わない。
+  読み込みはトークンが入っているときだけ走る。詳しくは privacy.html の同じ箇所。
+-->
+<script>
+  (function () {
+    var token = '794e8304fd9740688ee6a38cf6d23a87';
+    if (token.charAt(0) === '_') return;
+    var s = document.createElement('script');
+    s.type = 'module';
+    s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    s.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
+    document.head.appendChild(s);
+  })();
+</script>
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+
+  <div class="eyebrow"><a href="/">PokeDeck</a></div>
+  <h1>利用規約</h1>
+  <p class="updated">制定日 2025年1月18日 ／ 最終更新日 2026年9月5日</p>
+
+  <p class="lead">
+    この規約は、ポケモンカードのデッキ管理アプリ <strong>PokeDeck</strong>（Android 版・iPhone 版）と、
+    このウェブサイトを使うときの約束ごとを定めるものです。
+    以下では、アプリを作って配っている個人を「開発者」、使う方を「ユーザー」と呼びます。
+  </p>
+
+  <div class="panel">
+    <p><strong>先に、いちばん大事なところだけ。</strong></p>
+    <ul>
+      <li>無料です。かわりに広告が表示されます。</li>
+      <li>登録は要りません。Google ログインは、クラウド同期を使いたいときだけの任意です。</li>
+      <li><strong>PokeDeck は個人が作った非公式のファンアプリです。</strong>株式会社ポケモンおよび関連企業とは一切関係ありません。</li>
+      <li>共有リンクは、<strong>一度配ると取り消せません。</strong></li>
+    </ul>
+  </div>
+
+  <h2>1. 規約への同意</h2>
+  <p>
+    アプリをインストールして使いはじめた時点で、この規約に同意したものとします。
+    同意できない場合は、アプリの利用を中止し、アンインストールしてください。
+  </p>
+
+  <h2>2. 使いはじめるとき</h2>
+  <p>
+    <strong>利用登録は必要ありません。</strong>インストールすればそのまま使えます。
+  </p>
+  <p>
+    Google アカウントでのログインは、マイデッキなどを複数の端末で同じ内容にしたい場合の
+    <strong>任意の機能</strong>です。ログインしなくても、デッキの作成・編集・共有を含む
+    ほとんどの機能はそのまま使えます。
+  </p>
+
+  <h2>3. 料金と広告</h2>
+  <p>
+    <strong>アプリの利用は無料です。</strong>有料の機能や課金はありません。
+    そのかわり、運営の費用にあてるためにアプリ内に広告が表示されます。
+  </p>
+  <p>
+    通信料はユーザーの負担となります。
+  </p>
+
+  <h2>4. やってはいけないこと</h2>
+  <ul>
+    <li>法令または公序良俗に反する行為</li>
+    <li>開発者または第三者の権利を侵害する行為</li>
+    <li>アプリやサーバーの運営を妨げる行為（過度な自動アクセスを含みます）</li>
+    <li>アプリを改変し、または不正な手段で利用する行為</li>
+    <li>他のユーザーに迷惑をかける行為</li>
+    <li>カードの画像やデータを、この規約の範囲を超えて再配布する行為</li>
+  </ul>
+  <p>
+    これらに当たると判断した場合、事前の通知なくクラウド同期の利用を停止することがあります。
+  </p>
+
+  <h2>5. デッキの共有について</h2>
+  <p>
+    デッキを共有すると、中身が入ったリンクができます。
+    <strong>一度配ったリンクは取り消せません。</strong>
+    リンクを知っている人は誰でもその中身を見られますので、送る相手にはご注意ください。
+  </p>
+  <p>
+    共有されたデッキを取り込んでも、送った側のデッキは変わりません。
+    詳しい仕組みは<a href="/privacy">プライバシーポリシー</a>に書いています。
+  </p>
+
+  <h2>6. クラウド同期について</h2>
+  <p>
+    ログインして預けたデータは、開発者が用意した外部サービス上に保存されます。
+    <strong>保存されたデータが常に利用できることや、失われないことを保証するものではありません。</strong>
+    大切なデータは、アプリの機能で画像として保存するなど、ご自身でも控えを取ってください。
+  </p>
+  <p>
+    預けたデータは、アプリの「設定 → アカウントを削除」からいつでもご自身で削除できます。
+  </p>
+
+  <h2>7. カードのデータと画像について</h2>
+  <p>
+    <strong>PokeDeck は個人が趣味で作った非公式のアプリです。</strong>
+    ポケットモンスター・ポケモン・Pokémon は任天堂・クリーチャーズ・ゲームフリークの登録商標であり、
+    本アプリは株式会社ポケモンおよび関連企業とは一切関係がありません。
+  </p>
+  <p>
+    アプリが表示するカードの名前・画像・大会の結果は、
+    <a href="https://www.pokemon-card.com/" target="_blank" rel="noopener">ポケモンカードゲーム公式サイト</a>
+    で公開されている情報を参照しています。これらの権利は各権利者に帰属します。
+    アプリはそれらを閲覧・整理しやすくするための道具であり、権利を移すものではありません。
+  </p>
+
+  <h2>8. 知的財産権</h2>
+  <p>
+    アプリそのもの（プログラム、画面の意匠、開発者が作成した文章や図）に関する権利は、
+    開発者または権利を許諾している者に帰属します。
+  </p>
+  <p>
+    ユーザーが作成したデッキの構成そのものは、ユーザーのものです。
+    開発者がそれを利用することはありません。
+  </p>
+
+  <h2>9. 免責</h2>
+  <p>
+    アプリは現状のまま提供されます。
+    カードのデータや大会の結果が、公式の情報と常に一致することを保証するものではありません。
+    <strong>大会などの場では、必ず公式の情報でご確認ください。</strong>
+  </p>
+  <p>
+    アプリの利用によってユーザーに生じた損害について、開発者は責任を負いません。
+    ただし、<strong>開発者の故意または重大な過失による場合、および
+    法令によりこの免責が認められない場合は、この限りではありません。</strong>
+  </p>
+
+  <h2>10. サービスの変更・停止・終了</h2>
+  <p>
+    開発者は、機能の追加・変更・削除を行うことがあります。
+    やむを得ない事情がある場合には、アプリやカードデータの配信を停止し、
+    または終了することがあります。終了する場合は、可能な限り事前にお知らせします。
+  </p>
+
+  <h2>11. プライバシー</h2>
+  <p>
+    情報の取り扱いについては<a href="/privacy">プライバシーポリシー</a>に定めます。
+    プライバシーポリシーは、この規約の一部を構成します。
+  </p>
+
+  <h2>12. この規約の変更</h2>
+  <p>
+    必要に応じてこの規約を変更することがあります。変更したときは、このページの最終更新日を改めます。
+    大きな変更のときは、アプリ上でもお知らせします。
+    変更後もアプリを使い続けた場合は、変更後の規約に同意したものとします。
+  </p>
+
+  <h2>13. お問い合わせ</h2>
+  <p>
+    この規約についてのお問い合わせは
+    <a href="https://forms.gle/KjpN6akKRnY2WzSz7" target="_blank" rel="noopener">お問い合わせフォーム</a>
+    または <a href="mailto:poke.nakayoshi.999@gmail.com">poke.nakayoshi.999@gmail.com</a> までお願いします。
+  </p>
+
+  <h2>14. 準拠法と管轄</h2>
+  <p>
+    この規約は日本法に従って解釈されます。
+    アプリに関して紛争が生じた場合には、開発者の住所地を管轄する裁判所を
+    第一審の合意管轄裁判所とします。
+  </p>
+
+  <footer>
+    <p>
+      ポケットモンスター・ポケモン・Pokémon は任天堂・クリーチャーズ・ゲームフリークの登録商標です。
+      PokeDeck は個人が作ったファンアプリであり、株式会社ポケモンおよび関連企業とは一切関係ありません。
+    </p>
+    <p><a href="/">PokeDeck について</a> ／ <a href="/privacy">プライバシーポリシー</a></p>
+  </footer>
+
+</div>
+</body>
+</html>
