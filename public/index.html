@@ -233,6 +233,13 @@
 </head>
 <body>
 
+<!-- ストアの印。上のボタンでも下の見出しでも同じものを使う。
+     ここを 1 か所にしておかないと、また上下で違う絵になる。 -->
+<svg xmlns="http://www.w3.org/2000/svg" hidden aria-hidden="true">
+  <symbol id="logo-play" viewBox="0 0 24 24" fill="none"><path d="M3.6 2.4c-.4.3-.6.7-.6 1.2v16.8c0 .5.2.9.6 1.2l9.6-9.6-9.6-9.6Z" fill="#00D8FF"/><path d="M16.8 8.4l-3-1.7-4.6 4.6v1.4l4.6 4.6 3-1.7c1-.6 1-2 0-2.6l-1-.6 1-.6c1-.6 1-2 0-2.4Z" fill="#FFD24C"/><path d="M13.8 6.7 4.6 1.5c-.4-.2-.8-.2-1 0l9.4 9.4 3.8-3.8-2-.4Z" fill="#3EE07A"/><path d="M4.6 22.5c.2.1.6.1 1 0l9.2-5.2-3.8-3.8-6.4 9Z" fill="#FF4B5C"/></symbol>
+  <symbol id="logo-apple" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.4c-.03-2.4 1.96-3.55 2.05-3.6-1.12-1.64-2.86-1.86-3.48-1.89-1.48-.15-2.9.87-3.65.87-.75 0-1.9-.85-3.13-.83-1.6.02-3.1.94-3.93 2.37-1.68 2.92-.43 7.24 1.2 9.6.8 1.16 1.75 2.46 3 2.41 1.2-.05 1.66-.78 3.11-.78 1.45 0 1.87.78 3.14.75 1.3-.02 2.13-1.18 2.92-2.35.92-1.35 1.3-2.66 1.32-2.73-.03-.01-2.53-.97-2.55-3.82ZM14.75 5.24c.66-.8 1.1-1.9 1-3.01-.96.04-2.13.64-2.82 1.44-.61.7-1.15 1.83-1 2.9 1.05.08 2.13-.53 2.82-1.33Z"/></symbol>
+</svg>
+
 <div class="glow-a"></div>
 <div class="glow-b"></div>
 
@@ -260,11 +267,11 @@
 8,000枚以上のカードから探して、組んで、画像で残せます。</p>
       <div class="cta-row">
         <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">
-          <svg class="store-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.6 2.4c-.4.3-.6.7-.6 1.2v16.8c0 .5.2.9.6 1.2l9.6-9.6-9.6-9.6Z" fill="#00D8FF"/><path d="M16.8 8.4l-3-1.7-4.6 4.6v1.4l4.6 4.6 3-1.7c1-.6 1-2 0-2.6l-1-.6 1-.6c1-.6 1-2 0-2.4Z" fill="#FFD24C"/><path d="M13.8 6.7 4.6 1.5c-.4-.2-.8-.2-1 0l9.4 9.4 3.8-3.8-2-.4Z" fill="#3EE07A"/><path d="M4.6 22.5c.2.1.6.1 1 0l9.2-5.2-3.8-3.8-6.4 9Z" fill="#FF4B5C"/></svg>
+          <svg class="store-icon" aria-hidden="true"><use href="#logo-play"/></svg>
           <span>Google Play<small>Android 版</small></span>
         </a>
         <a class="store-btn primary" href="https://apps.apple.com/app/id6747426098" target="_blank" rel="noopener">
-          <svg class="store-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.4c-.03-2.4 1.96-3.55 2.05-3.6-1.12-1.64-2.86-1.86-3.48-1.89-1.48-.15-2.9.87-3.65.87-.75 0-1.9-.85-3.13-.83-1.6.02-3.1.94-3.93 2.37-1.68 2.92-.43 7.24 1.2 9.6.8 1.16 1.75 2.46 3 2.41 1.2-.05 1.66-.78 3.11-.78 1.45 0 1.87.78 3.14.75 1.3-.02 2.13-1.18 2.92-2.35.92-1.35 1.3-2.66 1.32-2.73-.03-.01-2.53-.97-2.55-3.82ZM14.75 5.24c.66-.8 1.1-1.9 1-3.01-.96.04-2.13.64-2.82 1.44-.61.7-1.15 1.83-1 2.9 1.05.08 2.13-.53 2.82-1.33Z"/></svg>
+          <svg class="store-icon" aria-hidden="true"><use href="#logo-apple"/></svg>
           <span>App Store<small>iPhone 版</small></span>
         </a>
       </div>
@@ -404,13 +411,13 @@ SNSでの共有に。</p>
     <div class="platform-grid">
       <div class="platform-card">
         <span class="badge live">公開中</span>
-        <h3>🤖 Android</h3>
+        <h3><svg class="store-icon" aria-hidden="true"><use href="#logo-play"/></svg>Android</h3>
         <p>Google Play で「PokeDeck」として公開しています。無料です。</p>
         <a class="store-btn primary" href="https://play.google.com/store/apps/details?id=jp.egaz.pokemoncardtools" target="_blank" rel="noopener">Google Play で入手</a>
       </div>
       <div class="platform-card">
         <span class="badge live">公開中</span>
-        <h3>🍎 iOS</h3>
+        <h3><svg class="store-icon" aria-hidden="true"><use href="#logo-apple"/></svg>iOS</h3>
         <p>App Store で「PokeDeck」として公開しています。無料です。iOS 17 以降。</p>
         <a class="store-btn primary" href="https://apps.apple.com/app/id6747426098" target="_blank" rel="noopener">App Store で入手</a>
       </div>
