@@ -97,6 +97,17 @@ jobs:
           # エクストラはまだ揃っていない間 extraVersion が 0 のままなので、
           # 件数だけをコミットメッセージに添える。
           extra=$(node -p "const fs=require('fs');fs.existsSync('./data/cards-extra.json')?require('./data/cards-extra.json').length:0")
+          # 前回コミットした時点の件数。まだ add していないので HEAD 側が「前回」。
+          # **総数だけ出すと「増えていないのに更新と言われる」ことになる。**
+          # version.json だけが変わった回（配信元を足したときなど）が実際にあった。
+          count_before=$(git show HEAD:data/cards.json 2>/dev/null             | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).length))" 2>/dev/null || echo "$count")
+          extra_before=$(git show HEAD:data/cards-extra.json 2>/dev/null             | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).length))" 2>/dev/null || echo "$extra")
+          delta=$((count - count_before))
+          extra_delta=$((extra - extra_before))
+          summary="全 ${count} 件"
+          if [ "$delta" -ne 0 ]; then summary="$( [ "$delta" -gt 0 ] && echo "+${delta}" || echo "${delta}" ) 件 / 全 ${count} 件"; fi
+          if [ "$extra_delta" -ne 0 ]; then summary="${summary}、エクストラ $( [ "$extra_delta" -gt 0 ] && echo "+${extra_delta}" || echo "${extra_delta}" ) 件"; fi
+          if [ "$delta" -eq 0 ] && [ "$extra_delta" -eq 0 ]; then summary="${summary}・枚数に変化なし"; fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data public
@@ -119,6 +130,7 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "count=${count}" >> "$GITHUB_OUTPUT"
+          echo "summary=${summary}" >> "$GITHUB_OUTPUT"
 
       # カードが増えていたらアプリへ通知する。
       #
@@ -169,7 +181,7 @@ jobs:
         run: |
           curl -sS -X POST -H "Content-Type: application/json" \
             -d "$(node -pe 'JSON.stringify({content: process.argv[1]})' \
-                  "カードデータを更新しました v${{ steps.commit.outputs.version }}（全 ${{ steps.commit.outputs.count }} 件）")" \
+                  "カードデータを更新しました v${{ steps.commit.outputs.version }}（${{ steps.commit.outputs.summary }}）")" \
             "$DISCORD_WEBHOOK_URL"
 
       - name: Notify Discord on failure
