@@ -16,8 +16,9 @@
 // 人には正しく見えているのに SNS には古い読み方の結果が出る、という
 // いちばん気づけない壊れ方をする。写さずに読み込むこと。
 import { decode } from "../public/d/share-code.js";
-
-const IMAGE_BASE = "https://www.pokemon-card.com/assets/images/card_images/large/";
+// 頁と同じ組み立てを使う。索引の image は 2 通りの形をとるので、
+// 前置きを足すだけだと legend 配下の 43 枚で 404 になる（実際そうなっていた）。
+import { originalUrl } from "../public/d/card-image.js";
 
 // ページ側と同じ順で引く。スタンダードに無ければエクストラを見る。
 const INDEX_PATHS = ["/cards-min.json", "/cards-min-extra.json"];
@@ -127,7 +128,10 @@ function metaHtml(deck, card, shareUrl) {
   if (card) {
     // 公式サイトの画像をそのまま指す。X や LINE のクローラは公式から直に取りに行く。
     // 手元に写して配ると、公式の絵を自分の配信に載せることになるので、こちらを選ぶ。
-    tags.push(["og:image", IMAGE_BASE + card.image]);
+    // **webp（自前の配信）にしないこと。** クローラ側の対応がまちまちで、
+    // 共有先で絵が出なくなると配布経路そのものが痩せる。
+    // 取りに来るのはクローラが 1 回だけなので、軽くする利点も無い。
+    tags.push(["og:image", originalUrl(card.image)]);
     tags.push(["og:image:alt", card.name]);
     // カードは縦長（868x1212）なので、大きい方の型では上下が切られて
     // 絵の真ん中あたりが出る。名前まで見せたいなら、いずれ 1200x630 を

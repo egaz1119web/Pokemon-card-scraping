@@ -200,6 +200,7 @@
 
 <script type="module">
 import { decode } from './share-code.js';
+import { thumbUrl, originalUrl } from './card-image.js';
 
 // アプリが無いときの行き先。ストアへの入口は HTML 側の <a> が持っていて、
 // ここは intent:// に渡すぶんだけ。App Store の方は国を指定しない形にしてある
@@ -212,7 +213,7 @@ const APP_STORE_URL = 'https://apps.apple.com/app/id6747426098';
 const PACKAGE = 'jp.egaz.pokemoncardtools';
 /// アプリを直に呼ぶときの合図。Android / iOS の両方で同じ綴り。
 const APP_SCHEME = 'pokedeck';
-const IMAGE_BASE = 'https://www.pokemon-card.com/assets/images/card_images/large/';
+
 
 // アプリの PokemonType と同じ色。デッキの色みをページにも移す。
 const ENERGY_COLORS = {
@@ -420,8 +421,9 @@ function renderCards(deck) {
 /**
  * カードを拡大して見せる。
  *
- * 並べている絵はすでに公式の large をそのまま縮めて出しているので、
- * 拡大しても取りに行くものは無い（同じ URL がブラウザに載っている）。
+ * **並びと拡大で絵が違う。** 並びは自前の 540w（1 枚 77KB）で、拡大だけ公式の
+ * 原本（868x1212・321KB）を取りに行く。540w を引き伸ばすと絵柄も細かい文字も
+ * 読めず、拡大する意味が無くなるため。取りに行くのは押されたときの 1 枚だけ。
  *
  * **戻るで閉じられるようにしておくこと。** 携帯でこの頁を開く人は
  * LINE や X から来ていて、拡大したまま戻るを押すとデッキごと消えてしまう。
@@ -457,7 +459,7 @@ function setUpZoom() {
   const from = (target) => {
     const cell = target.closest('.card');
     const img = cell && cell.querySelector('img');
-    if (img) open(img.src, img.alt);
+    if (img) open(img.dataset.full || img.src, img.alt);
   };
 
   $('sections').addEventListener('click', (e) => from(e.target));
@@ -492,10 +494,18 @@ function section(name, cards) {
       cell.setAttribute('role', 'button');
       cell.setAttribute('aria-label', `${card.name}を大きく見る`);
       const img = document.createElement('img');
-      img.src = IMAGE_BASE + card.image;
+      img.src = thumbUrl(card.image);
+      // 拡大したときに取りに行く先。並びの 540w を引き伸ばしても読めないため。
+      img.dataset.full = originalUrl(card.image);
       img.alt = card.name;
       img.loading = 'lazy';
       img.decoding = 'async';
+      // 自前の配信にまだ無いカードは公式へ逃がす。取り込みは毎晩少しずつ進むので、
+      // 公式に出たばかりのカードはしばらくこちらを通る。
+      img.addEventListener('error', function fallback() {
+        img.removeEventListener('error', fallback);
+        img.src = originalUrl(card.image);
+      });
       cell.appendChild(img);
     } else {
       const blank = document.createElement('div');
