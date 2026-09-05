@@ -4,6 +4,11 @@ on:
   schedule:
     # 毎日 03:10 JST（= 18:10 UTC）。公式サイトの更新は日中なので夜間に回す。
     - cron: "10 18 * * *"
+    # 毎日 15:00 JST（= 06:00 UTC）。公式は昼にカードを追加することが多く、
+    # 夜間の巡回まで待つと知らせるのが丸一日遅れる。
+    # **通知を出すのはこちらの回だけ**（深夜 3 時に通知を飛ばさないため）。
+    # 差分取得なので、新しいカードが無い日は一覧の走査だけで 30 秒ほどで終わる。
+    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       refresh_all:
@@ -11,6 +16,20 @@ on:
         # data/refresh-progress.json に進捗が残っていて続きから走る。
         # 取り切るまでは毎回チェックを入れること。外すと進捗が読まれない。
         description: "全件の取り直しを進める（前回の続きから。取り切るまで毎回チェック）"
+        type: boolean
+        default: false
+      notify_test_only:
+        # 送信部の確認用。**自分の端末 1 台にだけ**届く。
+        # トピックではなく Secrets の FCM_TEST_TOKEN が指す端末へ送るので、
+        # 本番と同じ経路（JWT → access token → FCM）をそのまま試せる。
+        # 増えたカードが無い日でも見本を 1 通作って送り、控えは進めない。
+        description: "通知を自分の端末 1 台にだけ送る（確認用）"
+        type: boolean
+        default: false
+      notify_dry_run:
+        # 文面だけ確かめたいとき。差分と本文を表示するだけで、送信も控えの更新もしない。
+        # **誤って送ると取り消せない**ので、文面を変えたときは必ず一度これで見ること。
+        description: "通知は送らず、文面だけ表示する"
         type: boolean
         default: false
       max_fetch:
@@ -100,6 +119,48 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "count=${count}" >> "$GITHUB_OUTPUT"
+
+      # カードが増えていたらアプリへ通知する。
+      #
+      # **コミットの後に置くこと。** 押す前に通知すると、まだ配信されていない
+      # カードを見に来させることになる（Cloudflare はこのリポジトリから配る）。
+      #
+      # **steps.commit の結果で条件を付けないこと。** 深夜の回が先に見つけていた場合、
+      # 昼の回は「変化なし」になるが、まだ知らせていないぶんが残っている。
+      # 通知するかどうかは data/notified.json との差だけで決める。
+      - name: Notify card update
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * *'
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          DELAY_MS: "1000"
+          DRY_RUN: ${{ inputs.notify_dry_run && '1' || '0' }}
+          # 確認用のときだけ宛先を 1 台に絞る。
+          # 印（NOTIFY_TEST_ONLY）も一緒に渡すこと。トークンが空のまま進むと
+          # 宛先がトピックへ落ちて全員に飛ぶので、notify 側が印を見て止める。
+          NOTIFY_TEST_ONLY: ${{ inputs.notify_test_only && '1' || '0' }}
+          FCM_TEST_TOKEN: ${{ inputs.notify_test_only && secrets.FCM_TEST_TOKEN || '' }}
+        run: npm run notify
+
+      - name: Commit notified.json
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * *'
+        run: |
+          if git diff --quiet -- data/notified.json; then
+            echo "通知の控えに変化なし"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/notified.json
+          git commit -m "通知した時点のカードプールを控える"
+          for _ in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+          exit 1
 
       - name: Notify Discord
         if: steps.commit.outputs.changed == 'true' && env.DISCORD_WEBHOOK_URL != ''

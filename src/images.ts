@@ -26,7 +26,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 import { BlockedError, ORIGIN, fetchBinary, sleep } from "./http.js";
-import { listKeys, putObject, r2ConfigFromEnv } from "./r2.js";
+import { listKeys, putObject, r2ConfigFromEnv, type R2Config } from "./r2.js";
 
 /** 配信する幅。上の「なぜ 540 か」を読んでから変えること。 */
 const WIDTH = 540;
@@ -72,7 +72,7 @@ export function keyFor(imagePath: string): string {
   return imagePath.replace(/\/{2,}/g, "/").replace(/^\//, "").replace(/\.[a-zA-Z0-9]+$/, "") + ".webp";
 }
 
-function collectImagePaths(): string[] {
+export function collectImagePaths(): string[] {
   const paths = new Set<string>();
   for (const file of ["public/cards.json", "public/cards-extra.json"]) {
     if (!existsSync(file)) continue;
@@ -83,6 +83,76 @@ function collectImagePaths(): string[] {
     }
   }
   return [...paths].sort();
+}
+
+export interface MirrorResult {
+  done: number;
+  failed: number;
+  /** 公式サイトに拒否されて途中で手を引いたか。 */
+  blocked: boolean;
+  bytesIn: number;
+  bytesOut: number;
+}
+
+/**
+ * 渡されたパスを順に取って、縮めて R2 に置く。
+ *
+ * **名指しで呼べるように切り出してある。** 通知を出す前に「増えたカードの絵だけ」を
+ * 先に置きたいため（src/notify.ts）。一括の取り込みは並び順に進むので、
+ * 積み残しがあるうちは新しいカードまで永久に届かない。
+ */
+export async function mirrorPaths(
+  cfg: R2Config,
+  paths: string[],
+  { delayMs = DELAY_MS }: { delayMs?: number } = {},
+): Promise<MirrorResult> {
+  const out: MirrorResult = { done: 0, failed: 0, blocked: false, bytesIn: 0, bytesOut: 0 };
+
+  for (const [i, path] of paths.entries()) {
+    if (i > 0) await sleep(delayMs);
+    try {
+      const { body, contentType } = await fetchBinary(`${ORIGIN}${path}`);
+      // ブロック時に HTML のエラーページが 200 で返ることがある。
+      // 型を見ずに sharp へ渡すと、そこで初めて落ちて理由が分かりにくい。
+      if (!contentType.startsWith("image/")) {
+        throw new Error(`画像ではない応答 (${contentType || "型なし"})`);
+      }
+      const image = await sharp(body).resize({ width: WIDTH }).webp({ quality: QUALITY }).toBuffer();
+      const meta = await sharp(image).metadata();
+      if (!meta.width || meta.width < WIDTH / 2) {
+        throw new Error(`変換結果が不正 (width=${meta.width})`);
+      }
+      await putObject(cfg, keyFor(path), image, {
+        contentType: "image/webp",
+        cacheControl: CACHE_CONTROL,
+      });
+      out.done++;
+      out.bytesIn += body.length;
+      out.bytesOut += image.length;
+      if (out.done % 100 === 0) console.log(`  ${out.done}/${paths.length} 件`);
+    } catch (err) {
+      if (err instanceof BlockedError) {
+        // 403 は IP 単位のブロック。続けると状況が悪くなるだけなので即座に手を引く。
+        console.error(`アクセスを拒否された。ここで中断する: ${path}`);
+        out.blocked = true;
+        break;
+      }
+      out.failed++;
+      console.error(`  失敗 ${path}: ${err instanceof Error ? err.message : String(err)}`);
+      // 個別の失敗は飛ばす。R2 に置かれないので、次回の未取得として自然に拾い直される。
+    }
+  }
+  return out;
+}
+
+export function describe(result: MirrorResult): string {
+  const mb = (n: number): string => `${(n / 1024 / 1024).toFixed(1)}MB`;
+  return (
+    `置いた ${result.done} 件 / 失敗 ${result.failed} 件` +
+    (result.done > 0
+      ? ` / ${mb(result.bytesIn)} → ${mb(result.bytesOut)}（${(result.bytesIn / result.bytesOut).toFixed(1)} 倍軽い）`
+      : "")
+  );
 }
 
 async function main(): Promise<void> {
@@ -106,65 +176,19 @@ async function main(): Promise<void> {
     console.log(`  今回はこのうち ${batch.length} 件（MAX_IMAGES=${MAX_IMAGES}）`);
   }
 
-  let done = 0;
-  let failed = 0;
-  let bytesIn = 0;
-  let bytesOut = 0;
-  let blocked = false;
+  const result = await mirrorPaths(cfg, batch);
+  console.log(describe(result));
 
-  for (const [i, path] of batch.entries()) {
-    if (i > 0) await sleep(DELAY_MS);
-    try {
-      const { body, contentType } = await fetchBinary(`${ORIGIN}${path}`);
-      // ブロック時に HTML のエラーページが 200 で返ることがある。
-      // 型を見ずに sharp へ渡すと、そこで初めて落ちて理由が分かりにくい。
-      if (!contentType.startsWith("image/")) {
-        throw new Error(`画像ではない応答 (${contentType || "型なし"})`);
-      }
-      const out = await sharp(body).resize({ width: WIDTH }).webp({ quality: QUALITY }).toBuffer();
-      const meta = await sharp(out).metadata();
-      if (!meta.width || meta.width < WIDTH / 2) {
-        throw new Error(`変換結果が不正 (width=${meta.width})`);
-      }
-      await putObject(cfg, keyFor(path), out, {
-        contentType: "image/webp",
-        cacheControl: CACHE_CONTROL,
-      });
-      done++;
-      bytesIn += body.length;
-      bytesOut += out.length;
-      if (done % 100 === 0) {
-        console.log(`  ${done}/${batch.length} 件`);
-      }
-    } catch (err) {
-      if (err instanceof BlockedError) {
-        // 403 は IP 単位のブロック。続けると状況が悪くなるだけなので即座に手を引く。
-        console.error(`アクセスを拒否された。ここで中断する: ${path}`);
-        blocked = true;
-        break;
-      }
-      failed++;
-      console.error(`  失敗 ${path}: ${err instanceof Error ? err.message : String(err)}`);
-      // 個別の失敗は飛ばす。R2 に置かれないので、次回の未取得として自然に拾い直される。
-    }
-  }
-
-  const mb = (n: number): string => `${(n / 1024 / 1024).toFixed(1)}MB`;
-  console.log(
-    `置いた ${done} 件 / 失敗 ${failed} 件` +
-      (done > 0 ? ` / ${mb(bytesIn)} → ${mb(bytesOut)}（${(bytesIn / bytesOut).toFixed(1)} 倍軽い）` : ""),
-  );
-
-  const remaining = todo.length - done;
+  const remaining = todo.length - result.done;
   if (remaining > 0) {
     console.log(`残り ${remaining} 件。次の実行で続きから取る。`);
     // EX_TEMPFAIL: 再実行すれば進むことを CI に伝える（build.ts と同じ作法）。
     process.exitCode = 75;
   }
-  if (blocked) process.exitCode = 75;
+  if (result.blocked) process.exitCode = 75;
 }
 
-// keyFor は他から読める形にしてある（アプリ側と綴りを合わせる必要があるため）。
+// keyFor などは他から読める形にしてある（アプリ側と綴りを合わせる必要があるため）。
 // 読み込んだだけで取り込みが始まらないよう、直接実行されたときだけ走らせる。
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {

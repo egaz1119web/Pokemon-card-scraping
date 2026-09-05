@@ -15,7 +15,8 @@
     "events": "tsx src/events.ts",
     "events:pi": "bash scripts/pi-events.sh",
     "deck-url": "tsx src/deck-url.ts",
-    "images": "tsx src/images.ts"
+    "images": "tsx src/images.ts",
+    "notify": "tsx src/notify.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
