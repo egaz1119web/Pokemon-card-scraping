@@ -159,7 +159,7 @@ ACE SPEC）があり、逆に名前だけ似ていて種別が違うカードも
 
 ## 出力
 
-- `public/version.json` … `[{"id":1,"version":54,"extraVersion":0,"imageBase":"https://img.egaz.uk"}]`
+- `public/version.json` … `[{"id":1,"version":54,"extraVersion":0,"imageBase":"…","dataBase":"…"}]`
 - `public/cards.json` … スタンダードの積み上げ全件の配列
 - `public/cards-extra.json` … エクストラにしか無いカードの配列
 - `public/cards-min.json` … デッキ共有ページ用の索引（下記）
@@ -748,6 +748,7 @@ npm run deck-url -- <デッキID>   # 公式のデッキ ID → PokeDeck の共�
 | `EXTRA` | - | `0` でエクストラを触らない（スタンダードだけ回す） |
 | `SAMPLE_SIZE` | 150 | validate の標本数 |
 | `IMAGE_BASE` | `https://img.egaz.uk` | version.json に載せる画像の配信元 |
+| `DATA_BASE` | `https://pokedeck.op-sarada.workers.dev` | 同、カードデータの配信元 |
 | `MAX_IMAGES` | 2000 | images が 1 回で取得する上限 |
 | `REFRESH` | - | `1` で R2 にある画像も取り直す |
 | `R2_ACCOUNT_ID` ほか | - | R2 の資格情報（下記） |

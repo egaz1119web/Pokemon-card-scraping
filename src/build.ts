@@ -69,6 +69,20 @@ const WITH_EXTRA = process.env.EXTRA !== "0";
 const IMAGE_BASE = process.env.IMAGE_BASE ?? "https://img.egaz.uk";
 
 /**
+ * カードデータそのものの配信元。アプリはここから version.json や cards.json を取る。
+ *
+ * **卵と鶏になるので、アプリ側の作りに注意が要る。** この値を伝える version.json 自体が
+ * 配信元から取るものなので、移した先はアプリが「前回覚えた値」で取りに行くしかない。
+ * したがってアプリは (1) 覚えた先を使う (2) 失敗したら焼き込みの既定へ戻る、の 2 段構え
+ * にすること。片方でも欠けると、この値を書き間違えた瞬間に全端末がデータを取れなくなり、
+ * **こちらから直す手段が無くなる**（配信を直しても、それを取りに来られない）。
+ *
+ * 移すときは、移す前の配信元にもしばらく置いたままにして、
+ * 全端末が新しい先を覚えるのを待つこと。
+ */
+const DATA_BASE = process.env.DATA_BASE ?? "https://pokedeck.op-sarada.workers.dev";
+
+/**
  * 表に出る文字列に HTML の残骸がある＝古いパーサで取ったレコード。
  *
  * 見るのは本文だけでは足りない。実体参照を復号していなかった時期のものは
@@ -247,7 +261,8 @@ function canSkipCrawl(state: State, counts: ListCounts, masterSize: number): boo
   // 配信している version.json が今の設定と食い違っていたら書き直す必要がある。
   const version = `${OUT_DIR}/version.json`;
   if (!existsSync(version)) return false;
-  return readFileSync(version, "utf8").includes(IMAGE_BASE);
+  const published = readFileSync(version, "utf8");
+  return published.includes(IMAGE_BASE) && published.includes(DATA_BASE);
 }
 
 async function main(): Promise<void> {
@@ -518,6 +533,7 @@ async function main(): Promise<void> {
         version: state.version,
         extraVersion: state.extraVersion ?? 0,
         imageBase: IMAGE_BASE,
+        dataBase: DATA_BASE,
       },
     ]),
   );
