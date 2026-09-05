@@ -1,3 +1,4 @@
+import type { ListCounts } from "./list.js";
 /**
  * 1 枚のカードを表すレコード。
  *
@@ -57,6 +58,14 @@ export interface ListEntry {
 export interface State {
   version: number;
   updatedAt: string;
+  /**
+   * 前回の実行で見た一覧 4 本の総件数。
+   *
+   * 次の実行はまず 1 ページ目だけを見て、ここと同じなら**全ページの走査を省く**。
+   * 走査は 4 本合計で 9 分半かかり、新しいカードが無い日でも毎回払っていた。
+   * この項目が無い（初回）ときは省かずに全部走る。
+   */
+  listCounts?: ListCounts;
   /** 分割実行の途中で変更が入ったことを覚えておき、完走した回にまとめてバージョンを上げる */
   pendingBump?: boolean;
   /**

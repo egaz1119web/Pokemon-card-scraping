@@ -17,7 +17,8 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { fetchCard } from "./detail.js";
-import { fetchAllListEntries, fetchAllDeckEntries, cardIdOf, uniqueByCardId } from "./list.js";
+import { fetchAllListEntries, fetchAllDeckEntries, cardIdOf, uniqueByCardId, fetchListCounts } from "./list.js";
+import type { ListCounts } from "./list.js";
 import { sleep, BlockedError } from "./http.js";
 import type { CardRecord, ListEntry, State } from "./types.js";
 import { normalizeKeyOrder } from "./types.js";
@@ -218,6 +219,37 @@ async function fetchMany(
   return { cards, blocked };
 }
 
+/**
+ * 一覧の全ページ走査を省いてよいか。
+ *
+ * **省いてよいのは「前回と総件数が 4 本とも同じ」ときだけ。**
+ * 件数が同じまま中身が入れ替わることは起こりうるが、その場合も次に件数が
+ * 動いた回で拾い直せる。カードの詳細はもともと cardId で差分取得しているので、
+ * 省いたせいで取り違えることはない。
+ *
+ * 取り直しの指定が入っている回、控えがまだ無い回（初回）、手元にカードが
+ * 1 枚も無い回は省かない。配信物が今の IMAGE_BASE を指していない回も省かない
+ * （省くと version.json が書き換わらず、配信元を変えても伝わらない）。
+ */
+function canSkipCrawl(state: State, counts: ListCounts, masterSize: number): boolean {
+  if (REFRESH_ALL || REFRESH_DIRTY || REFRESH_IDS.length > 0) return false;
+  if (masterSize === 0) return false;
+  const before = state.listCounts;
+  if (!before) return false;
+  if (
+    before.searchStandard !== counts.searchStandard ||
+    before.searchExtra !== counts.searchExtra ||
+    before.deckStandard !== counts.deckStandard ||
+    before.deckExtra !== counts.deckExtra
+  ) {
+    return false;
+  }
+  // 配信している version.json が今の設定と食い違っていたら書き直す必要がある。
+  const version = `${OUT_DIR}/version.json`;
+  if (!existsSync(version)) return false;
+  return readFileSync(version, "utf8").includes(IMAGE_BASE);
+}
+
 async function main(): Promise<void> {
   let master = readJson<CardRecord[]>(MASTER, []);
   if (master.length === 0) {
@@ -228,6 +260,26 @@ async function main(): Promise<void> {
   const extraMaster = readJson<CardRecord[]>(MASTER_EXTRA, []);
   // 1 枚のカードはどちらか一方にしか入らない。索引は両方を合わせて 1 つ持つ。
   const byId = new Map([...master, ...extraMaster].map((c) => [c.cardId, c]));
+
+  const state = readJson<State>(STATE, { version: 47, updatedAt: "", pendingBump: false });
+
+  // **一覧の走査を省けるか、先に 4 リクエストだけで見る。**
+  //
+  // 4 本の全ページ走査は合計 9 分半かかる（1 ページ 39 件しか返らず、
+  // エクストラのカード検索が 534 ページ、デッキ構築が 558 ページ）。
+  // 新しいカードが 1 枚も無い日でも毎回これを払っていた。15:00 の回を足して
+  // 1 日 2 回になったので、なおさら効く。
+  //
+  // 省くのは「前回と総件数が 4 本とも同じ」ときだけ。取り直しの指定が
+  // 入っている回や、控えがまだ無い回（初回）は省かない。
+  const counts = await fetchListCounts();
+  if (canSkipCrawl(state, counts, master.length)) {
+    console.log(
+      `一覧に変化なし（スタンダード ${counts.searchStandard} / エクストラ ${counts.searchExtra} 件）。` +
+        "全ページの走査を省いて終了する。",
+    );
+    return;
+  }
 
   console.log("カード一覧を取得中...");
   const live = uniqueByCardId(await fetchAllListEntries("XY"));
@@ -400,7 +452,6 @@ async function main(): Promise<void> {
   const changed = serialize(master) !== serialize(ordered);
   const extraChanged = serialize(extraMaster) !== serialize(orderedExtra);
 
-  const state = readJson<State>(STATE, { version: 47, updatedAt: "", pendingBump: false });
   // updatedAt 以外の中身を控えておく。下で「この回に何か動いたか」を見るのに使う。
   const stateBefore = JSON.stringify({ ...state, updatedAt: "" });
 
@@ -433,6 +484,11 @@ async function main(): Promise<void> {
   if (changed || extraChanged || JSON.stringify({ ...state, updatedAt: "" }) !== stateBefore) {
     state.updatedAt = new Date().toISOString();
   }
+
+  // 次の回が走査を省けるように、この回に見た総件数を控える。
+  // **省いた回では更新しないこと**（省いた回は crawl していないので、
+  // 控えを進めると次も省き続けてしまう…わけではないが、意味のある値にならない）。
+  state.listCounts = counts;
 
   mkdirSync(OUT_DIR, { recursive: true });
   writeLineDelimitedArray(MASTER, ordered);

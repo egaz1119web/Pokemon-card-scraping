@@ -132,3 +132,36 @@ export async function fetchAllDeckEntries(
   }
   return entries;
 }
+
+/** 一覧 4 本の総件数。全ページ走査を省けるかの判断に使う。 */
+export interface ListCounts {
+  searchStandard: number;
+  searchExtra: number;
+  deckStandard: number;
+  deckExtra: number;
+}
+
+/**
+ * 4 本の一覧の **1 ページ目だけ**を取って、総件数（hitCnt）を集める。
+ *
+ * **全ページ走査は 4 本合計で 9 分半かかる。** 1 ページ 39 件しか返らず、
+ * エクストラのカード検索が 534 ページ、デッキ構築が 558 ページあるため。
+ * 新しいカードが 1 枚も無い日でも毎回これを払っていた。
+ *
+ * 総件数が前回と同じなら中身も同じとみなして走査を省く。
+ * 「同数のまま入れ替わる」ことは起こりうるが、その場合も次に件数が動いた回で
+ * 拾い直せるうえ、カードの詳細は元々 cardId で差分取得しているので取り違えない。
+ */
+export async function fetchListCounts(): Promise<ListCounts> {
+  const hit = async (url: string): Promise<number> => {
+    const res = await fetchJson<ResultApiResponse>(url);
+    if (res.result !== 1) throw new Error(`件数の取得に失敗: ${res.errMsg}`);
+    return res.hitCnt;
+  };
+  return {
+    searchStandard: await hit(pageUrl(1, "XY")),
+    searchExtra: await hit(pageUrl(1, "BW")),
+    deckStandard: await hit(deckPageUrl(1, "XY")),
+    deckExtra: await hit(deckPageUrl(1, "BW")),
+  };
+}
