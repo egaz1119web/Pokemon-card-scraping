@@ -1,0 +1,83 @@
+name: mirror-images
+
+# カードの絵を公式から取って、縮めて R2 に置く。
+# 何を・なぜやっているかは src/images.ts の冒頭を読むこと。
+#
+# **このワークフローは何もコミットしない。**
+# 進捗は R2 の中身そのものが持っている（src/r2.ts の listKeys）。
+# リポジトリに進捗ファイルを置くと「済みと書いてあるが R2 には無い」が
+# いつか必ず起きるので、置いた先を正にしてある。
+
+on:
+  schedule:
+    # 毎日 04:30 JST（= 19:30 UTC）。update-cards（03:10 JST）が
+    # 新しいカードを取り込んだ後に回して、その日のうちに絵も揃える。
+    - cron: "30 19 * * *"
+  workflow_dispatch:
+    inputs:
+      max_images:
+        # 初回の取り込みは 2 万件を超える。日次の 2000 件のままだと 11 日かかるので、
+        # 手で回すときだけ上げられるようにしておく。
+        # 1 件 1 秒なので、ジョブの上限 330 分に収まるのは 15,000 件あたりまで。
+        description: "1 回の実行で取得する上限（1 件 1 秒。既定 2000）"
+        type: string
+        default: "2000"
+      refresh:
+        # 公式が同じパスの絵を差し替えたときだけ使う。
+        # 普段は R2 に無いものだけを取るので、これは不要。
+        description: "R2 に既にあるものも取り直して置き直す"
+        type: boolean
+        default: false
+
+# 同時に走ると同じ絵を二重に取りに行くため直列化する
+concurrency:
+  group: mirror-images
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # 公式サイトの WAF に当たると 403 になる。その場合スクリプトは
+      # 置き終えた分をそのままにして終了コード 75 を返すので、
+      # ジョブは失敗扱いにしない（続きは次回の実行で再開される）。
+      # 未取得が残っているときも同じ 75 を返す。
+      - name: Mirror images to R2
+        id: mirror
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          DELAY_MS: "1000"
+          MAX_IMAGES: ${{ inputs.max_images || '2000' }}
+          REFRESH: ${{ inputs.refresh && '1' || '0' }}
+        run: |
+          set +e
+          npm run images
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "::warning::まだ残りがある（または途中で中断した）。次回の実行で続きから取る。"
+          elif [ "$code" -ne 0 ]; then
+            exit "$code"
+          fi
+
+      - name: Notify Discord on failure
+        if: failure() && env.DISCORD_WEBHOOK_URL != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -sS -X POST -H "Content-Type: application/json" \
+            -d '{"content":"カード画像の R2 への取り込みに失敗しました。Actions のログを確認してください。"}' \
+            "$DISCORD_WEBHOOK_URL"

@@ -55,6 +55,19 @@ const REFRESH_IDS = (process.env.REFRESH_IDS ?? "")
 const WITH_EXTRA = process.env.EXTRA !== "0";
 
 /**
+ * カード画像の配信元。アプリはここを見て絵を取りに行く。
+ *
+ * **アプリに焼き込まずに配信で伝えるのは意図的。**
+ * 焼き込むと、配信元を変えるたびにストアの審査を通す必要がある。
+ * version.json は起動のたびに読まれる（max-age=300）ので、ここを書き替えれば
+ * 次の起動から全端末が新しい配信元を見る。取り違えたときに戻せることが重要。
+ *
+ * アプリ側は、この値が無い古い配信や取りこぼしに備えて
+ * 公式サイトへのフォールバックを必ず持つこと。
+ */
+const IMAGE_BASE = process.env.IMAGE_BASE ?? "https://img.egaz.uk";
+
+/**
  * 表に出る文字列に HTML の残骸がある＝古いパーサで取ったレコード。
  *
  * 見るのは本文だけでは足りない。実体参照を復号していなかった時期のものは
@@ -443,7 +456,14 @@ async function main(): Promise<void> {
   // 0 は「エクストラはまだ揃っていない」＝取りに行かなくてよい、の意。
   writeFileSync(
     `${OUT_DIR}/version.json`,
-    JSON.stringify([{ id: 1, version: state.version, extraVersion: state.extraVersion ?? 0 }]),
+    JSON.stringify([
+      {
+        id: 1,
+        version: state.version,
+        extraVersion: state.extraVersion ?? 0,
+        imageBase: IMAGE_BASE,
+      },
+    ]),
   );
 
   // 大会結果は別管理（data/events.json）。カード巡回とは無関係にそのまま配信へ流す。

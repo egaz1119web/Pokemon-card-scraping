@@ -14,11 +14,13 @@
     "compare": "tsx src/compare.ts",
     "events": "tsx src/events.ts",
     "events:pi": "bash scripts/pi-events.sh",
-    "deck-url": "tsx src/deck-url.ts"
+    "deck-url": "tsx src/deck-url.ts",
+    "images": "tsx src/images.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "playwright-core": "^1.62.1",
+    "sharp": "^0.35.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "wrangler": "^4.125.0"
